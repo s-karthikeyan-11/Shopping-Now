@@ -51,7 +51,8 @@ npm run seed               # creates an admin account + sample products
 npm run dev                 # starts on http://localhost:5000
 ```
 
-Seeded admin login: `admin@example.com` / `admin123` — change the password after first login.
+Development-only seeded admin login: `admin@example.com` / `admin123`. In production, set
+`SEED_ADMIN_EMAIL` and a unique `SEED_ADMIN_PASSWORD` (12+ characters) before seeding.
 
 MongoDB: point `MONGO_URI` at a local `mongod` instance or a MongoDB Atlas connection string.
 No replica set is required — order placement uses sequential writes, not a multi-document
@@ -85,6 +86,7 @@ npm run dev                 # starts on http://localhost:3000
 
 ## Notes / next steps
 
-- Passwords are hashed with bcrypt; JWTs are stored in `localStorage` on the frontend for simplicity — for production, consider httpOnly cookies.
-- No payment gateway is wired in; `placeOrder` assumes payment succeeds and creates the order directly. Add Razorpay/Stripe before going live.
+- Passwords are hashed with bcrypt and browser sessions use httpOnly JWT cookies. In production, serve both apps over HTTPS, set `NODE_ENV=production`, use a 32+ character random `JWT_SECRET`, and configure `CLIENT_URL` (multiple origins may be comma-separated).
+- The API applies security headers, a 20 KB JSON body limit, and separate authentication/API rate limits. Set `TRUST_PROXY=1` only when deployed behind one trusted reverse proxy.
+- No payment gateway is wired in, so checkout currently accepts Cash on Delivery only. Add Razorpay/Stripe confirmation before enabling online methods.
 - No image upload — the product form takes an image URL. Add multer + cloud storage if you need file uploads.

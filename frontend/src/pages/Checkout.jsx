@@ -1,14 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Banknote, Check, CreditCard, LockKeyhole, Smartphone, Truck } from 'lucide-react';
+import { ArrowLeft, Banknote, Check, Truck } from 'lucide-react';
 import api from '../api/axios';
 import { useCart } from '../context/CartContext';
 
 const steps = ['Delivery address', 'Payment method', 'Order review'];
 const paymentOptions = [
-  { id: 'UPI', label: 'UPI', detail: 'Pay using your UPI app', icon: Smartphone },
-  { id: 'Credit/Debit Card', label: 'Credit or debit card', detail: 'Visa, Mastercard and RuPay', icon: CreditCard },
-  { id: 'Net Banking', label: 'Net banking', detail: 'Select your bank at payment', icon: LockKeyhole },
   { id: 'Cash on Delivery', label: 'Cash on Delivery', detail: 'Pay when your order is delivered.', icon: Banknote },
 ];
 const emptyAddress = { line1: '', city: '', state: '', pincode: '', phone: '' };
@@ -95,7 +92,7 @@ const Checkout = () => {
                 <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-slate-900">{label}</span><span className="mt-1 block text-xs text-slate-500">{detail}</span></span>
               </label>)}
             </div>
-            <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">Online payment processing is not configured yet. Cash on Delivery is available now; other selections will be recorded but are not charged.</p>
+            <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">Online payment processing is not configured yet. Cash on Delivery is available now.</p>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row"><button className="btn btn-secondary" onClick={() => setStep(0)}>Back to address</button><button className="btn btn-primary" onClick={() => setStep(2)}>Review order</button></div>
           </div>}
 

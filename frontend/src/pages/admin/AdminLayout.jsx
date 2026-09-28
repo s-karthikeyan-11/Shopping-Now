@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BarChart3, Boxes, LayoutDashboard, Menu, ShoppingCart, Users, X } from 'lucide-react';
+import { BarChart3, Boxes, LayoutDashboard, Menu, Users, X } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router-dom';
 
 const linkClass = ({ isActive }) =>

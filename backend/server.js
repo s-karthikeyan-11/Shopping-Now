@@ -1,7 +1,12 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const cookieParser = require('cookie-parser');
+const mongoose = require('mongoose');
 const connectDB = require('./config/db');
+const { getClientOrigins, validateEnvironment } = require('./config/env');
 
 const authRoutes = require('./routes/authRoutes');
 const productRoutes = require('./routes/productRoutes');
@@ -9,24 +14,55 @@ const cartRoutes = require('./routes/cartRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 
-connectDB();
-
 const app = express();
-const configuredClientOrigin = process.env.CLIENT_URL;
+const configuredClientOrigins = getClientOrigins();
+const isProduction = process.env.NODE_ENV === 'production';
+
+const createRateLimiter = ({ limit, message }) => rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  skip: (req) => req.method === 'OPTIONS',
+  message: { message },
+});
+
+const apiLimiter = createRateLimiter({
+  limit: Number.parseInt(process.env.API_RATE_LIMIT_MAX || '300', 10),
+  message: 'Too many requests. Please try again later.',
+});
+const authLimiter = createRateLimiter({
+  limit: Number.parseInt(process.env.AUTH_RATE_LIMIT_MAX || '20', 10),
+  message: 'Too many authentication attempts. Please try again in 15 minutes.',
+});
+
+app.disable('x-powered-by');
+app.set('trust proxy', process.env.TRUST_PROXY === '1');
+app.use(helmet());
 app.use(cors({
   origin: (origin, callback) => {
     const isLocalDevelopmentOrigin = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin || '');
-    if (!origin || !configuredClientOrigin || origin === configuredClientOrigin || isLocalDevelopmentOrigin) {
+    const allowLocalDevelopment = !isProduction && isLocalDevelopmentOrigin;
+    if (!origin || configuredClientOrigins.includes(origin) || allowLocalDevelopment) {
       return callback(null, true);
     }
-    return callback(new Error('Origin is not allowed by CORS'));
+    return callback(Object.assign(new Error('Origin is not allowed by CORS'), { status: 403, expose: true }));
   },
+  credentials: true,
+  maxAge: 86400,
 }));
-app.use(express.json());
+app.use(cookieParser());
+app.use(express.json({ limit: '20kb' }));
 
-app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
+app.get('/api/health', (req, res) => {
+  const databaseConnected = mongoose.connection.readyState === 1;
+  res.status(databaseConnected ? 200 : 503).json({
+    status: databaseConnected ? 'ok' : 'degraded',
+  });
+});
 
-app.use('/api/auth', authRoutes);
+app.use('/api', apiLimiter);
+app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/orders', orderRoutes);
@@ -37,9 +73,43 @@ app.use((req, res) => res.status(404).json({ message: 'Route not found' }));
 
 // Central error handler (catches anything thrown outside try/catch)
 app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(500).json({ message: 'Server error', error: err.message });
+  const status = err.status || (err.type === 'entity.parse.failed' ? 400 : 500);
+  const message = err.type === 'entity.parse.failed'
+    ? 'Invalid JSON request body'
+    : err.type === 'entity.too.large'
+      ? 'Request body is too large'
+      : status < 500 && err.expose
+        ? err.message
+        : 'Server error';
+  console.error(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`, err);
+  res.status(status).json({ message });
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+const startServer = async () => {
+  validateEnvironment();
+  await connectDB();
+
+  const server = app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+  const shutdown = (signal) => {
+    console.log(`${signal} received; closing server`);
+    server.close(async () => {
+      await mongoose.connection.close();
+      process.exit(0);
+    });
+    setTimeout(() => process.exit(1), 10000).unref();
+  };
+
+  process.once('SIGTERM', () => shutdown('SIGTERM'));
+  process.once('SIGINT', () => shutdown('SIGINT'));
+  return server;
+};
+
+if (require.main === module) {
+  startServer().catch((err) => {
+    console.error('Failed to start server:', err.message);
+    process.exit(1);
+  });
+}
+
+module.exports = { app, startServer };

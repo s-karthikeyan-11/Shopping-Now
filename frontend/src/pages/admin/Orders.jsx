@@ -9,6 +9,13 @@ const STATUS_STYLES = {
   Delivered: 'bg-emerald-100 text-emerald-700',
   Cancelled: 'bg-rose-100 text-rose-700',
 };
+const STATUS_TRANSITIONS = {
+  Pending: ['Processing', 'Cancelled'],
+  Processing: ['Shipped', 'Cancelled'],
+  Shipped: ['Delivered', 'Cancelled'],
+  Delivered: [],
+  Cancelled: [],
+};
 
 const AdminOrders = () => {
   const [orders, setOrders] = useState([]);
@@ -28,8 +35,12 @@ const AdminOrders = () => {
   };
 
   const handleStatusChange = async (id, status) => {
-    await api.put(`/admin/orders/${id}/status`, { status });
-    load(filter);
+    try {
+      await api.put(`/admin/orders/${id}/status`, { status });
+      load(filter);
+    } catch (err) {
+      window.alert(err.response?.data?.message || 'Could not update order status');
+    }
   };
 
   return (
@@ -73,7 +84,7 @@ const AdminOrders = () => {
                     value={o.status}
                     onChange={(e) => handleStatusChange(o._id, e.target.value)}
                   >
-                    {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                    {[o.status, ...(STATUS_TRANSITIONS[o.status] || [])].map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </td>
                 <td className="table-td text-slate-600">{new Date(o.createdAt).toLocaleDateString()}</td>

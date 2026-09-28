@@ -2,20 +2,74 @@ const Order = require('../models/Order');
 const User = require('../models/User');
 const Product = require('../models/Product');
 
+const errorStatus = (err) => (err.name === 'ValidationError' || err.name === 'CastError' ? 400 : 500);
+
+// Do not create an order for an online method until a payment gateway confirms it.
+const PAYMENT_METHODS = ['Cash on Delivery'];
+const CHECKOUT_LOCK_TIMEOUT_MS = 5 * 60 * 1000;
+const STATUS_TRANSITIONS = {
+  Pending: ['Processing', 'Cancelled'],
+  Processing: ['Shipped', 'Cancelled'],
+  Shipped: ['Delivered', 'Cancelled'],
+  Delivered: [],
+  Cancelled: [],
+};
+
+const httpError = (status, message) => Object.assign(new Error(message), { status });
+
+const validateShippingAddress = (value) => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+
+  const address = Object.fromEntries(
+    ['line1', 'city', 'state', 'pincode', 'phone'].map((key) => [key, String(value[key] || '').trim()])
+  );
+
+  if (Object.values(address).some((field) => !field)) return null;
+  if (!/^\d{6}$/.test(address.pincode)) return null;
+  if (!/^[0-9+()\-\s]{7,20}$/.test(address.phone)) return null;
+  return address;
+};
+
 // POST /api/orders  { shippingAddress }  -- places order from current cart
 // Note: uses plain sequential writes (no multi-document transaction) so it
 // works against a standalone MongoDB instance, not just a replica set.
 exports.placeOrder = async (req, res) => {
+  let checkoutLocked = false;
+  let cartCleared = false;
+  let user;
+  let originalCart = [];
+  const deductedItems = [];
+
   try {
-    const paymentMethods = ['UPI', 'Credit/Debit Card', 'Net Banking', 'Cash on Delivery'];
     const paymentMethod = req.body.paymentMethod || 'Cash on Delivery';
-    if (!paymentMethods.includes(paymentMethod)) {
-      return res.status(400).json({ message: 'Invalid payment method' });
+    if (!PAYMENT_METHODS.includes(paymentMethod)) {
+      return res.status(400).json({ message: 'Cash on Delivery is the only available payment method' });
     }
-    const user = await User.findById(req.user._id).populate('cart.product');
+    const shippingAddress = validateShippingAddress(req.body.shippingAddress);
+    if (!shippingAddress) {
+      return res.status(400).json({ message: 'A complete valid shipping address is required' });
+    }
+
+    // A user may only submit one checkout at a time. A stale lock can be recovered
+    // after a failed request or server restart.
+    const staleLock = new Date(Date.now() - CHECKOUT_LOCK_TIMEOUT_MS);
+    const lock = await User.findOneAndUpdate(
+      {
+        _id: req.user._id,
+        $or: [{ checkoutLock: null }, { checkoutLock: { $exists: false } }, { checkoutLock: { $lt: staleLock } }],
+      },
+      { $set: { checkoutLock: new Date() } },
+      { new: false }
+    );
+    if (!lock) return res.status(409).json({ message: 'A checkout is already in progress' });
+    checkoutLocked = true;
+
+    user = await User.findById(req.user._id).populate('cart.product');
+    if (!user) throw httpError(401, 'User no longer exists');
     if (!user.cart.length) {
       return res.status(400).json({ message: 'Cart is empty' });
     }
+    originalCart = user.cart.map((item) => ({ product: item.product._id || item.product, quantity: item.quantity }));
 
     const items = [];
     let subtotal = 0;
@@ -53,12 +107,26 @@ exports.placeOrder = async (req, res) => {
       subtotal += discounted * cartItem.quantity;
       totalGst += gstAmount * cartItem.quantity;
 
-      product.stock -= cartItem.quantity;
-      await product.save();
+      // Conditional, atomic decrement: concurrent checkouts cannot make stock negative.
+      const updatedProduct = await Product.findOneAndUpdate(
+        { _id: product._id, isActive: true, stock: { $gte: cartItem.quantity } },
+        { $inc: { stock: -cartItem.quantity } },
+        { new: true }
+      );
+      if (!updatedProduct) {
+        throw httpError(409, `Insufficient stock for ${product.name}`);
+      }
+      deductedItems.push({ product: product._id, quantity: cartItem.quantity });
     }
 
     const itemTotal = +(subtotal + totalGst).toFixed(2);
     const deliveryFee = itemTotal >= 2000 ? 0 : 99;
+    // Empty the cart before creating the order while the checkout lock is held;
+    // this prevents duplicate orders if a client retries a slow request.
+    user.cart = [];
+    await user.save();
+    cartCleared = true;
+
     const order = await Order.create({
       user: user._id,
       items,
@@ -67,16 +135,32 @@ exports.placeOrder = async (req, res) => {
       totalAmount: +(itemTotal + deliveryFee).toFixed(2),
       deliveryFee,
       paymentMethod,
-      shippingAddress: req.body.shippingAddress || {},
+      shippingAddress,
       status: 'Pending',
     });
 
-    user.cart = [];
-    await user.save();
-
     res.status(201).json(order);
   } catch (err) {
-    res.status(500).json({ message: 'Failed to place order', error: err.message });
+    // Sequential writes are used so standalone MongoDB works. Compensate every
+    // successful decrement if a later write fails.
+    try {
+      if (deductedItems.length) {
+        await Promise.all(
+          deductedItems.map((item) => Product.updateOne({ _id: item.product }, { $inc: { stock: item.quantity } }))
+        );
+      }
+      if (cartCleared && user) {
+        user.cart = originalCart;
+        await user.save();
+      }
+    } catch (rollbackError) {
+      console.error('Order rollback failed:', rollbackError);
+    }
+    res.status(err.status || 500).json({ message: err.status ? err.message : 'Failed to place order' });
+  } finally {
+    if (checkoutLocked) {
+      await User.updateOne({ _id: req.user._id }, { $unset: { checkoutLock: 1 } });
+    }
   }
 };
 
@@ -86,7 +170,7 @@ exports.getMyOrders = async (req, res) => {
     const orders = await Order.find({ user: req.user._id }).sort({ createdAt: -1 });
     res.json(orders);
   } catch (err) {
-    res.status(500).json({ message: 'Failed to fetch orders', error: err.message });
+    res.status(errorStatus(err)).json({ message: 'Failed to fetch orders' });
   }
 };
 
@@ -95,13 +179,13 @@ exports.getOrderById = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id).populate('user', 'name email');
     if (!order) return res.status(404).json({ message: 'Order not found' });
-    const isOwner = order.user._id.toString() === req.user._id.toString();
+    const isOwner = order.user && order.user._id.toString() === req.user._id.toString();
     if (!isOwner && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Not authorized to view this order' });
     }
     res.json(order);
   } catch (err) {
-    res.status(500).json({ message: 'Failed to fetch order', error: err.message });
+    res.status(errorStatus(err)).json({ message: 'Failed to fetch order' });
   }
 };
 
@@ -115,7 +199,7 @@ exports.adminGetOrders = async (req, res) => {
     const orders = await Order.find(filter).populate('user', 'name email').sort({ createdAt: -1 });
     res.json(orders);
   } catch (err) {
-    res.status(500).json({ message: 'Failed to fetch orders', error: err.message });
+    res.status(errorStatus(err)).json({ message: 'Failed to fetch orders' });
   }
 };
 
@@ -123,14 +207,17 @@ exports.adminGetOrders = async (req, res) => {
 exports.updateOrderStatus = async (req, res) => {
   try {
     const { status } = req.body;
-    const valid = ['Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled'];
-    if (!valid.includes(status)) return res.status(400).json({ message: 'Invalid status' });
+    if (!Object.hasOwn(STATUS_TRANSITIONS, status)) return res.status(400).json({ message: 'Invalid status' });
 
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: 'Order not found' });
+    if (status === order.status) return res.json(order);
+    if (!STATUS_TRANSITIONS[order.status].includes(status)) {
+      return res.status(400).json({ message: `Cannot change ${order.status} orders to ${status}` });
+    }
 
-    // Restock items if cancelling an order that wasn't already cancelled
-    if (status === 'Cancelled' && order.status !== 'Cancelled') {
+    // A cancelled order is terminal, so its items can only be restocked once.
+    if (status === 'Cancelled') {
       for (const item of order.items) {
         await Product.findByIdAndUpdate(item.product, { $inc: { stock: item.quantity } });
       }
@@ -140,6 +227,6 @@ exports.updateOrderStatus = async (req, res) => {
     await order.save();
     res.json(order);
   } catch (err) {
-    res.status(500).json({ message: 'Failed to update order status', error: err.message });
+    res.status(errorStatus(err)).json({ message: 'Failed to update order status' });
   }
 };

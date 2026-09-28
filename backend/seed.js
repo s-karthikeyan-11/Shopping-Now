@@ -9,16 +9,25 @@ const Product = require('./models/Product');
 const run = async () => {
   await connectDB();
 
-  const adminEmail = 'admin@example.com';
+  const isProduction = process.env.NODE_ENV === 'production';
+  const adminEmail = process.env.SEED_ADMIN_EMAIL || (isProduction ? '' : 'admin@example.com');
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD || (isProduction ? '' : 'admin123');
+  if (!adminEmail || !adminPassword) {
+    throw new Error('SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD are required in production');
+  }
+  if (isProduction && adminPassword.length < 12) {
+    throw new Error('SEED_ADMIN_PASSWORD must be at least 12 characters in production');
+  }
+
   let admin = await User.findOne({ email: adminEmail });
   if (!admin) {
     admin = await User.create({
       name: 'Admin',
       email: adminEmail,
-      password: 'admin123',
+      password: adminPassword,
       role: 'admin',
     });
-    console.log('Created admin -> email: admin@example.com  password: admin123');
+    console.log(`Created admin account: ${adminEmail}`);
   } else {
     console.log('Admin already exists');
   }

@@ -1,5 +1,7 @@
 const Product = require('../models/Product');
 
+const errorStatus = (err) => (err.name === 'ValidationError' || err.name === 'CastError' ? 400 : 500);
+
 // GET /api/products  (public) - list active products, with optional search/category filter
 exports.getProducts = async (req, res) => {
   try {
@@ -10,18 +12,18 @@ exports.getProducts = async (req, res) => {
     const products = await Product.find(filter).sort({ createdAt: -1 });
     res.json(products);
   } catch (err) {
-    res.status(500).json({ message: 'Failed to fetch products', error: err.message });
+    res.status(errorStatus(err)).json({ message: 'Failed to fetch products' });
   }
 };
 
 // GET /api/products/:id (public)
 exports.getProductById = async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id);
+    const product = await Product.findOne({ _id: req.params.id, isActive: true });
     if (!product) return res.status(404).json({ message: 'Product not found' });
     res.json(product);
   } catch (err) {
-    res.status(500).json({ message: 'Failed to fetch product', error: err.message });
+    res.status(errorStatus(err)).json({ message: 'Failed to fetch product' });
   }
 };
 
@@ -33,7 +35,7 @@ exports.adminGetProducts = async (req, res) => {
     const products = await Product.find().sort({ createdAt: -1 });
     res.json(products);
   } catch (err) {
-    res.status(500).json({ message: 'Failed to fetch products', error: err.message });
+    res.status(errorStatus(err)).json({ message: 'Failed to fetch products' });
   }
 };
 
@@ -50,7 +52,7 @@ exports.createProduct = async (req, res) => {
     });
     res.status(201).json(product);
   } catch (err) {
-    res.status(500).json({ message: 'Failed to create product', error: err.message });
+    res.status(errorStatus(err)).json({ message: 'Failed to create product' });
   }
 };
 
@@ -66,17 +68,22 @@ exports.updateProduct = async (req, res) => {
     if (!product) return res.status(404).json({ message: 'Product not found' });
     res.json(product);
   } catch (err) {
-    res.status(500).json({ message: 'Failed to update product', error: err.message });
+    res.status(errorStatus(err)).json({ message: 'Failed to update product' });
   }
 };
 
 // DELETE /api/admin/products/:id
 exports.deleteProduct = async (req, res) => {
   try {
-    const product = await Product.findByIdAndDelete(req.params.id);
+    // Archive rather than hard-delete so historical orders and carts retain a valid reference.
+    const product = await Product.findOneAndUpdate(
+      { _id: req.params.id, isActive: true },
+      { isActive: false },
+      { new: true }
+    );
     if (!product) return res.status(404).json({ message: 'Product not found' });
-    res.json({ message: 'Product deleted' });
+    res.json({ message: 'Product archived' });
   } catch (err) {
-    res.status(500).json({ message: 'Failed to delete product', error: err.message });
+    res.status(errorStatus(err)).json({ message: 'Failed to archive product' });
   }
 };

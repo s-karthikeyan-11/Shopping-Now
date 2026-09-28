@@ -86,7 +86,7 @@ const Register = () => {
                   <input
                     className="input pr-11"
                     type={showPassword ? 'text' : 'password'}
-                    minLength={6}
+                    minLength={8}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required

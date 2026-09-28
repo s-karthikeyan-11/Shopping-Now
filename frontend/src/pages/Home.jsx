@@ -51,7 +51,7 @@ const Home = () => {
     setSearch(query);
     setSelectedCategory(category);
     load(query);
-  }, [location.pathname, location.search]);
+  }, [location.pathname, location.search, searchParams]);
 
   useEffect(() => {
     const target = location.hash.slice(1) || (location.pathname === '/categories' ? 'categories' : '');

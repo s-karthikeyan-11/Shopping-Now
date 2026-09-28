@@ -10,7 +10,7 @@ const productSchema = new mongoose.Schema(
     discountPercent: { type: Number, default: 0, min: 0, max: 100 },
     gstPercent: { type: Number, default: 0, min: 0, max: 100 },
     stock: { type: Number, required: true, min: 0, default: 0 },
-    lowStockThreshold: { type: Number, default: 5 },
+    lowStockThreshold: { type: Number, default: 5, min: 0 },
     isActive: { type: Boolean, default: true },
   },
   { timestamps: true }
