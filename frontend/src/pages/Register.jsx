@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const Register = () => {
@@ -11,6 +11,7 @@ const Register = () => {
   const [submitting, setSubmitting] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -18,7 +19,7 @@ const Register = () => {
     setSubmitting(true);
     try {
       await register(name, email, password);
-      navigate('/');
+      navigate(location.state?.from?.pathname || location.state?.from || '/');
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed');
     } finally {
@@ -107,7 +108,7 @@ const Register = () => {
 
             <p className="mt-6 text-center text-sm text-slate-600">
               Already have an account?{' '}
-              <Link to="/login" className="font-semibold text-slate-900 underline-offset-4 hover:underline">
+              <Link to="/login" state={{ from: location.state?.from }} className="font-semibold text-slate-900 underline-offset-4 hover:underline">
                 Log in
               </Link>
             </p>

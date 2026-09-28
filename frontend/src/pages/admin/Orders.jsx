@@ -2,6 +2,13 @@ import React, { useEffect, useState } from 'react';
 import api from '../../api/axios';
 
 const STATUSES = ['Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled'];
+const STATUS_STYLES = {
+  Pending: 'bg-amber-100 text-amber-700',
+  Processing: 'bg-sky-100 text-sky-700',
+  Shipped: 'bg-violet-100 text-violet-700',
+  Delivered: 'bg-emerald-100 text-emerald-700',
+  Cancelled: 'bg-rose-100 text-rose-700',
+};
 
 const AdminOrders = () => {
   const [orders, setOrders] = useState([]);
@@ -28,9 +35,13 @@ const AdminOrders = () => {
   return (
     <div>
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-2xl font-bold text-slate-900">Orders</h2>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Operations</p>
+          <h2 className="mt-2 text-2xl font-bold text-slate-900 sm:text-[28px]">Orders</h2>
+        </div>
+
         <label className="flex items-center gap-2 text-sm text-slate-600">
-          Filter by status:
+          <span className="whitespace-nowrap">Filter by status:</span>
           <select className="input w-auto min-w-[180px]" value={filter} onChange={handleFilter}>
             <option value="">All</option>
             {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -38,8 +49,8 @@ const AdminOrders = () => {
         </label>
       </div>
 
-      <div className="overflow-hidden rounded-[24px] border border-slate-200">
-        <table className="w-full border-collapse bg-white">
+      <div className="overflow-x-auto rounded-[24px] border border-slate-200">
+        <table className="w-full min-w-[720px] border-collapse bg-white">
           <thead>
             <tr>
               <th className="table-th">Order</th><th className="table-th">Customer</th><th className="table-th">Items</th>
@@ -49,18 +60,23 @@ const AdminOrders = () => {
           <tbody>
             {orders.map((o) => (
               <tr key={o._id}>
-                <td className="table-td">#{o._id.slice(-6).toUpperCase()}</td>
+                <td className="table-td font-semibold text-slate-800">#{o._id.slice(-6).toUpperCase()}</td>
                 <td className="table-td">
-                  {o.user?.name}<br /><span className="text-xs text-slate-500">{o.user?.email}</span>
+                  <div className="font-medium text-slate-800">{o.user?.name}</div>
+                  <div className="text-xs text-slate-500">{o.user?.email}</div>
                 </td>
-                <td className="table-td">{o.items.map((it) => `${it.name} x${it.quantity}`).join(', ')}</td>
-                <td className="table-td">₹{Number(o.totalAmount || 0).toFixed(2)}</td>
+                <td className="table-td max-w-[220px] text-slate-700">{o.items.map((it) => `${it.name} x${it.quantity}`).join(', ')}</td>
+                <td className="table-td font-semibold text-slate-800">₹{Number(o.totalAmount || 0).toFixed(2)}</td>
                 <td className="table-td">
-                  <select className="input min-w-[140px]" value={o.status} onChange={(e) => handleStatusChange(o._id, e.target.value)}>
+                  <select
+                    className={`input min-w-[150px] ${STATUS_STYLES[o.status] || 'bg-slate-100 text-slate-700'}`}
+                    value={o.status}
+                    onChange={(e) => handleStatusChange(o._id, e.target.value)}
+                  >
                     {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </td>
-                <td className="table-td">{new Date(o.createdAt).toLocaleDateString()}</td>
+                <td className="table-td text-slate-600">{new Date(o.createdAt).toLocaleDateString()}</td>
               </tr>
             ))}
           </tbody>

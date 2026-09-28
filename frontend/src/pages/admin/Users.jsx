@@ -23,12 +23,16 @@ const AdminUsers = () => {
 
   return (
     <div>
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-slate-900">Users</h2>
+      <div className="mb-6 flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Membership</p>
+          <h2 className="mt-2 text-2xl font-bold text-slate-900 sm:text-[28px]">Users</h2>
+        </div>
+        <span className="admin-badge border-slate-200 bg-slate-50 text-slate-600">{users.length} members</span>
       </div>
 
-      <div className="overflow-hidden rounded-[24px] border border-slate-200">
-        <table className="w-full border-collapse bg-white">
+      <div className="overflow-x-auto rounded-[24px] border border-slate-200">
+        <table className="w-full min-w-[620px] border-collapse bg-white">
           <thead>
             <tr>
               <th className="table-th">Name</th><th className="table-th">Email</th><th className="table-th">Joined</th>
@@ -38,11 +42,11 @@ const AdminUsers = () => {
           <tbody>
             {users.map((u) => (
               <tr key={u._id}>
-                <td className="table-td">{u.name}</td>
+                <td className="table-td font-medium text-slate-800">{u.name}</td>
                 <td className="table-td">{u.email}</td>
                 <td className="table-td">{new Date(u.createdAt).toLocaleDateString()}</td>
                 <td className="table-td">
-                  <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${u.isBlocked ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                  <span className={`table-chip ${u.isBlocked ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
                     {u.isBlocked ? 'Blocked' : 'Active'}
                   </span>
                 </td>

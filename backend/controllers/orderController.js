@@ -7,6 +7,11 @@ const Product = require('../models/Product');
 // works against a standalone MongoDB instance, not just a replica set.
 exports.placeOrder = async (req, res) => {
   try {
+    const paymentMethods = ['UPI', 'Credit/Debit Card', 'Net Banking', 'Cash on Delivery'];
+    const paymentMethod = req.body.paymentMethod || 'Cash on Delivery';
+    if (!paymentMethods.includes(paymentMethod)) {
+      return res.status(400).json({ message: 'Invalid payment method' });
+    }
     const user = await User.findById(req.user._id).populate('cart.product');
     if (!user.cart.length) {
       return res.status(400).json({ message: 'Cart is empty' });
@@ -52,12 +57,16 @@ exports.placeOrder = async (req, res) => {
       await product.save();
     }
 
+    const itemTotal = +(subtotal + totalGst).toFixed(2);
+    const deliveryFee = itemTotal >= 2000 ? 0 : 99;
     const order = await Order.create({
       user: user._id,
       items,
       subtotal: +subtotal.toFixed(2),
       totalGst: +totalGst.toFixed(2),
-      totalAmount: +(subtotal + totalGst).toFixed(2),
+      totalAmount: +(itemTotal + deliveryFee).toFixed(2),
+      deliveryFee,
+      paymentMethod,
       shippingAddress: req.body.shippingAddress || {},
       status: 'Pending',
     });

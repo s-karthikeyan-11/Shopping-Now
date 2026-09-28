@@ -5,13 +5,13 @@ const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem('authUser');
+    const saved = localStorage.getItem('authUser') || sessionStorage.getItem('authUser');
     return saved ? JSON.parse(saved) : null;
   });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     if (!token) {
       setLoading(false);
       return;
@@ -20,20 +20,27 @@ export const AuthProvider = ({ children }) => {
       .get('/auth/me')
       .then(({ data }) => {
         setUser(data.user);
-        localStorage.setItem('authUser', JSON.stringify(data.user));
+        const storage = localStorage.getItem('token') ? localStorage : sessionStorage;
+        storage.setItem('authUser', JSON.stringify(data.user));
       })
       .catch(() => {
         setUser(null);
         localStorage.removeItem('token');
         localStorage.removeItem('authUser');
+        sessionStorage.removeItem('token');
+        sessionStorage.removeItem('authUser');
       })
       .finally(() => setLoading(false));
   }, []);
 
-  const login = async (email, password) => {
+  const login = async (email, password, remember = true) => {
     const { data } = await api.post('/auth/login', { email, password });
-    localStorage.setItem('token', data.token);
-    localStorage.setItem('authUser', JSON.stringify(data.user));
+    const storage = remember ? localStorage : sessionStorage;
+    const otherStorage = remember ? sessionStorage : localStorage;
+    otherStorage.removeItem('token');
+    otherStorage.removeItem('authUser');
+    storage.setItem('token', data.token);
+    storage.setItem('authUser', JSON.stringify(data.user));
     setUser(data.user);
     return data.user;
   };
@@ -49,6 +56,8 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('authUser');
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('authUser');
     setUser(null);
   };
 

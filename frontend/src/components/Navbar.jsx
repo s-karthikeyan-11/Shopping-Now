@@ -1,155 +1,99 @@
 import React, { useState } from 'react';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { Heart, House, LayoutGrid, LogOut, Search, ShoppingBag, ShoppingCart, UserRound } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 
 const navClass = ({ isActive }) =>
   `relative px-2 py-2 text-sm font-medium transition ${
-    isActive ? 'text-slate-900' : 'text-slate-600 hover:text-slate-900'
+    isActive ? 'text-emerald-800' : 'text-slate-600 hover:text-slate-900'
   }`;
 
 const Navbar = () => {
   const { user, logout, isAdmin } = useAuth();
   const { items } = useCart();
+  const location = useLocation();
   const navigate = useNavigate();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [searchParams] = useSearchParams();
+  const [search, setSearch] = useState(searchParams.get('search') || '');
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
-    setIsSidebarOpen(false);
     navigate('/');
   };
 
   const itemCount = items.reduce((sum, i) => sum + i.quantity, 0);
 
+  const handleSearch = (event) => {
+    event.preventDefault();
+    navigate(`/products${search.trim() ? `?search=${encodeURIComponent(search.trim())}` : ''}`);
+  };
+
   const navLinks = [
-    { to: '/', label: 'Home' },
-    { to: '/shop', label: 'Shop' },
-    { to: '/#categories', label: 'Categories' },
-    ...(user ? [{ to: '/orders', label: 'Orders' }] : []),
+    { to: '/', label: 'Home', end: true },
+    { to: '/categories', label: 'Categories' },
+    { to: '/products', label: 'Shop' },
+  ];
+
+  const mobileLinks = [
+    { to: '/', label: 'Home', icon: House, end: true },
+    { to: '/categories', label: 'Categories', icon: LayoutGrid },
+    { to: '/wishlist', label: 'Wishlist', icon: Heart },
+    { to: '/cart', label: 'Cart', icon: ShoppingCart, count: itemCount },
+    { to: user ? '/profile' : '/login', label: user ? 'Profile' : 'Login', icon: UserRound },
   ];
 
   return (
     <>
-      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/80 backdrop-blur-xl">
-        <div className="section-shell flex h-20 items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              aria-label="Open menu"
-              className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-xl text-slate-700 shadow-sm transition hover:border-slate-300 lg:hidden"
-              onClick={() => setIsSidebarOpen((open) => !open)}
-            >
-              ☰
-            </button>
+      <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur-xl">
+        <div className="section-shell flex min-h-16 items-center gap-4 py-2.5 sm:min-h-[76px]">
+          <Link to="/" className="flex shrink-0 items-center gap-2 text-lg font-black text-slate-900 sm:text-xl">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-800 text-white"><ShoppingBag size={17} /></span>
+            <span>SHOP-NOW</span>
+          </Link>
 
-            <Link to="/" className="text-2xl font-black tracking-tight text-slate-900">
-              SHOP-NOW🛒
-            </Link>
-          </div>
+          <form onSubmit={handleSearch} className="hidden min-w-0 flex-1 items-center rounded-xl border border-slate-200 bg-slate-50 px-3 focus-within:border-emerald-700 md:flex">
+            <Search size={17} className="shrink-0 text-slate-500" />
+            <input aria-label="Search products" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search products, brands and more" className="h-11 min-w-0 flex-1 bg-transparent px-3 text-sm outline-none placeholder:text-slate-400" />
+            <button className="text-sm font-semibold text-emerald-800" type="submit">Search</button>
+          </form>
 
-          <nav className="hidden items-center gap-7 lg:flex">
-            {navLinks.map((link) => (
-              <NavLink key={link.to} to={link.to} className={navClass}>
-                {link.label}
-              </NavLink>
-            ))}
+          <nav className="hidden shrink-0 items-center gap-3 lg:flex">
+            {navLinks.map((link) => <NavLink key={link.to} to={link.to} end={link.end} className={({ isActive }) => navClass({ isActive: isActive || (link.to === '/' && location.pathname === '/home') })}>{link.label}</NavLink>)}
           </nav>
 
-          <div className="flex items-center gap-2 sm:gap-3">
-            <button type="button" className="hidden h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-lg text-slate-700 shadow-sm transition hover:border-slate-300 sm:inline-flex" aria-label="Search">
-              ⌕
-            </button>
-            <button type="button" className="hidden h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-lg text-slate-700 shadow-sm transition hover:border-slate-300 sm:inline-flex" aria-label="Wishlist">
-              ♡
-            </button>
-
-            <Link to="/cart" className="relative inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-lg text-slate-700 shadow-sm transition hover:border-slate-300" aria-label="Cart">
-              🛒
-              {itemCount > 0 && (
-                <span className="absolute -right-2 -top-2 inline-flex min-w-[1.35rem] items-center justify-center rounded-full bg-slate-900 px-1.5 py-0.5 text-[10px] font-bold text-white">
-                  {itemCount}
-                </span>
-              )}
+          <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
+            <Link to="/wishlist" aria-label="Wishlist" title="Wishlist" className="hidden h-10 w-10 items-center justify-center rounded-xl text-slate-700 transition hover:bg-slate-100 lg:inline-flex"><Heart size={19} /></Link>
+            <Link to="/cart" aria-label={`Cart, ${itemCount} items`} title="Cart" className="relative hidden h-10 w-10 items-center justify-center rounded-xl text-slate-700 transition hover:bg-slate-100 lg:inline-flex">
+              <ShoppingCart size={19} />
+              {itemCount > 0 && <span className="absolute right-0 top-0 flex h-[18px] min-w-[18px] -translate-y-1/4 translate-x-1/4 items-center justify-center rounded-full bg-emerald-800 px-1 text-[10px] font-bold text-white">{itemCount}</span>}
             </Link>
-
-            {!user ? (
-              <div className="hidden items-center gap-2 sm:flex">
-                <Link to="/login" className="btn btn-secondary px-4 py-2.5">Login</Link>
-                <Link to="/register" className="btn btn-primary px-4 py-2.5">Sign up</Link>
-              </div>
-            ) : (
-              <div className="hidden items-center gap-2 sm:flex">
-                {isAdmin ? (
-                  <Link to="/admin" className="btn btn-secondary px-4 py-2.5">Admin</Link>
-                ) : (
-                  <Link to="/orders" className="btn btn-secondary px-4 py-2.5">Profile</Link>
-                )}
-                <button type="button" onClick={handleLogout} className="btn btn-outline px-4 py-2.5">
-                  Logout
-                </button>
+            {!user ? <div className="hidden items-center gap-2 lg:flex"><Link to="/login" className="btn btn-secondary px-3 py-2">Login</Link><Link to="/register" className="btn btn-primary px-3 py-2">Register</Link></div> : (
+              <div className="relative hidden lg:block">
+                <button type="button" aria-expanded={profileOpen} onClick={() => setProfileOpen((open) => !open)} className="inline-flex h-10 items-center gap-2 rounded-xl px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100"><UserRound size={17} /><span>{isAdmin ? 'Admin' : 'Account'}</span></button>
+                {profileOpen && <div className="absolute right-0 top-12 z-50 w-52 rounded-xl border border-slate-200 bg-white p-2 shadow-xl"><p className="truncate px-3 py-2 text-xs text-slate-500">{user.name || user.email}</p><Link onClick={() => setProfileOpen(false)} to={isAdmin ? '/admin' : '/profile'} className="block rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">{isAdmin ? 'Admin dashboard' : 'My profile'}</Link><Link onClick={() => setProfileOpen(false)} to="/orders" className="block rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Orders</Link><button type="button" onClick={() => { setProfileOpen(false); handleLogout(); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50"><LogOut size={15} />Log out</button></div>}
               </div>
             )}
           </div>
         </div>
+        <form onSubmit={handleSearch} className="section-shell flex pb-2 md:hidden">
+          <div className="flex w-full items-center rounded-xl border border-slate-200 bg-slate-50 px-3"><Search size={16} className="text-slate-500" /><input aria-label="Search products" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search products" className="h-10 min-w-0 flex-1 bg-transparent px-2 text-sm outline-none" /><button type="submit" className="sr-only">Search</button></div>
+        </form>
       </header>
 
-      <div className={`fixed inset-0 z-50 transition ${isSidebarOpen ? 'pointer-events-auto visible' : 'pointer-events-none invisible'}`}>
-        <div
-          className={`absolute inset-0 bg-slate-950/45 transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0'}`}
-          onClick={() => setIsSidebarOpen(false)}
-        />
-
-        <aside
-          className={`absolute left-0 top-0 flex h-full w-[82%] max-w-sm flex-col border-r border-slate-200 bg-white p-4 shadow-xl transition-transform duration-300 ease-in-out ${
-            isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
-          }`}
-        >
-          <div className="mb-6 flex items-center justify-between">
-            <div className="text-xl font-black tracking-tight text-slate-900">SHOP-NOW🛒</div>
-            <button type="button" aria-label="Close menu" className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-xl text-slate-700" onClick={() => setIsSidebarOpen(false)}>
-              ×
-            </button>
-          </div>
-
-          <nav className="space-y-1">
-            {[
-              { to: '/', label: 'Home', icon: '⌂' },
-              { to: '/', label: 'Shop', icon: '◫' },
-              { to: '/#categories', label: 'Categories', icon: '▣' },
-              { to: '/orders', label: 'Orders', icon: '◌' },
-              { to: '/login', label: 'Wishlist', icon: '♡' },
-              { to: '/orders', label: 'Profile', icon: '◉' },
-              ...(isAdmin ? [{ to: '/admin', label: 'Admin Dashboard', icon: '⚑' }] : []),
-            ].map((link) => (
-              <NavLink
-                key={link.label}
-                to={link.to}
-                className={({ isActive }) =>
-                  `flex items-center gap-3 rounded-xl px-3 py-3 text-base font-medium transition ${
-                    isActive ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-                  }`
-                }
-                onClick={() => setIsSidebarOpen(false)}
-              >
-                <span>{link.icon}</span>
-                {link.label}
-              </NavLink>
-            ))}
-
-            {!user ? (
-              <div className="mt-4 space-y-2 border-t border-slate-200 pt-4">
-                <Link to="/login" className="btn btn-secondary w-full" onClick={() => setIsSidebarOpen(false)}>Login</Link>
-                <Link to="/register" className="btn btn-primary w-full" onClick={() => setIsSidebarOpen(false)}>Create account</Link>
-              </div>
-            ) : (
-              <button type="button" className="btn btn-outline mt-4 w-full" onClick={handleLogout}>
-                Logout
-              </button>
-            )}
-          </nav>
-        </aside>
-      </div>
+      <nav aria-label="Mobile navigation" className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgba(15,23,42,0.08)] lg:hidden">
+        <div className="mx-auto grid h-16 max-w-xl grid-cols-5">
+          {mobileLinks.map(({ to, label, icon: Icon, count, end }) => <NavLink key={label} to={to} end={end} className={({ isActive }) => {
+            const path = location.pathname;
+            const active = isActive || (label === 'Home' && ['/home', '/products', '/product'].some((route) => path === route || path.startsWith(`${route}/`))) || (label === 'Cart' && path === '/checkout') || ((label === 'Profile' || label === 'Login') && ['/profile', '/orders', '/order/', '/login', '/register'].some((route) => path === route || path.startsWith(route)));
+            return `relative flex flex-col items-center justify-center gap-1 text-[10px] font-medium transition ${active ? 'text-emerald-800' : 'text-slate-500'}`;
+          }}>
+            <span className="relative"><Icon size={19} strokeWidth={2} />{count > 0 && <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-800 px-1 text-[9px] font-bold text-white">{count}</span>}</span>
+            <span>{label}</span>
+          </NavLink>)}
+        </div>
+      </nav>
     </>
   );
 };

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../api/axios';
 
 const statusClass = {
@@ -12,9 +13,16 @@ const statusClass = {
 const Orders = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const loadOrders = () => {
+    setLoading(true);
+    setError('');
+    api.get('/orders').then(({ data }) => setOrders(data)).catch((err) => setError(err.response?.data?.message || 'Your orders could not be loaded. Try again.')).finally(() => setLoading(false));
+  };
 
   useEffect(() => {
-    api.get('/orders').then(({ data }) => setOrders(data)).finally(() => setLoading(false));
+    loadOrders();
   }, []);
 
   if (loading) {
@@ -39,7 +47,9 @@ const Orders = () => {
         <h1 className="mt-2 text-4xl font-bold text-slate-900">My orders</h1>
       </div>
 
-      {orders.length === 0 ? (
+      {error && <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-center"><p className="text-sm text-rose-800">{error}</p><button type="button" className="btn btn-secondary mt-4" onClick={loadOrders}>Try again</button></div>}
+
+      {!error && orders.length === 0 ? (
         <div className="mx-auto max-w-2xl rounded-[32px] border border-dashed border-slate-300 bg-white p-10 text-center shadow-sm">
           <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-slate-100 text-3xl">📦</div>
           <h2 className="text-2xl font-bold text-slate-900">No orders yet</h2>
@@ -48,7 +58,7 @@ const Orders = () => {
             Start shopping
           </button>
         </div>
-      ) : (
+      ) : !error && (
         <div className="space-y-4">
           {orders.map((o) => (
             <div className="card p-5 sm:p-6" key={o._id}>
@@ -77,6 +87,7 @@ const Orders = () => {
                   ))}
                 </ul>
               </div>
+              <div className="mt-4 flex justify-end"><Link className="btn btn-secondary" to={`/order/${o._id}`}>Track order</Link></div>
             </div>
           ))}
         </div>

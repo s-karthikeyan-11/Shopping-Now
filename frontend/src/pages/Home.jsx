@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Search, SlidersHorizontal, Sparkles, X } from 'lucide-react';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import api from '../api/axios';
 import ProductCard from '../components/ProductCard';
 
@@ -12,28 +14,54 @@ const categoryImages = {
 };
 
 const Home = () => {
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
   const [products, setProducts] = useState([]);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(searchParams.get('search') || '');
+  const [selectedCategory, setSelectedCategory] = useState('All');
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [toast, setToast] = useState('');
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
+  const [minimumRating, setMinimumRating] = useState('0');
+  const [inStockOnly, setInStockOnly] = useState(false);
+  const [sortBy, setSortBy] = useState('featured');
 
-  const load = async (q) => {
+  const load = async (q = '') => {
     setLoading(true);
+    setLoadError('');
     try {
-      const { data } = await api.get('/products', { params: q ? { search: q } : {} });
+      const params = {};
+      if (q) params.search = q;
+      const { data } = await api.get('/products', { params });
       setProducts(data);
+    } catch (err) {
+      setLoadError(err.response?.data?.message || 'Products could not be loaded. Check your connection and try again.');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    load();
-  }, []);
+    const query = searchParams.get('search') || '';
+    setSearch(query);
+    setSelectedCategory('All');
+    load(query);
+  }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    if (location.pathname === '/categories') document.getElementById('categories')?.scrollIntoView({ behavior: 'smooth' });
+  }, [location.pathname, loading]);
 
   const handleSearch = (e) => {
     e.preventDefault();
     load(search);
+  };
+
+  const handleCategoryChange = (category) => {
+    setSelectedCategory(category);
   };
 
   const showToast = (name) => {
@@ -47,10 +75,28 @@ const Home = () => {
       const key = product.category || 'General';
       map[key] = (map[key] || 0) + 1;
     });
-    return Object.entries(map).slice(0, 4);
+    return ['All', ...Object.keys(map)];
   }, [products]);
 
-  const featuredProducts = products.slice(0, 4);
+  const visibleProducts = useMemo(() => {
+    const filtered = products.filter((product) => {
+      const price = Number(product.finalPrice || 0);
+      const categoryMatch = selectedCategory === 'All' || (product.category || 'General') === selectedCategory;
+      return categoryMatch && (!minPrice || price >= Number(minPrice)) && (!maxPrice || price <= Number(maxPrice)) && Number(product.rating || 4.8) >= Number(minimumRating) && (!inStockOnly || Number(product.stock) > 0);
+    });
+    if (sortBy === 'price-low') return filtered.sort((a, b) => Number(a.finalPrice) - Number(b.finalPrice));
+    if (sortBy === 'price-high') return filtered.sort((a, b) => Number(b.finalPrice) - Number(a.finalPrice));
+    if (sortBy === 'name') return filtered.sort((a, b) => a.name.localeCompare(b.name));
+    return filtered;
+  }, [products, selectedCategory, minPrice, maxPrice, minimumRating, inStockOnly, sortBy]);
+
+  const filterPanel = <div className="space-y-5">
+    <div><h3 className="text-sm font-bold text-slate-900">Category</h3><div className="mt-2 space-y-1">{categories.map((category) => <button type="button" key={category} onClick={() => handleCategoryChange(category)} className={`block w-full rounded-lg px-2.5 py-2 text-left text-sm ${selectedCategory === category ? 'bg-emerald-50 font-semibold text-emerald-800' : 'text-slate-600 hover:bg-slate-50'}`}>{category}</button>)}</div></div>
+    <div><h3 className="text-sm font-bold text-slate-900">Price range</h3><div className="mt-2 grid grid-cols-2 gap-2"><input aria-label="Minimum price" className="input px-2" type="number" min="0" placeholder="Min ₹" value={minPrice} onChange={(event) => setMinPrice(event.target.value)} /><input aria-label="Maximum price" className="input px-2" type="number" min="0" placeholder="Max ₹" value={maxPrice} onChange={(event) => setMaxPrice(event.target.value)} /></div></div>
+    <div><h3 className="text-sm font-bold text-slate-900">Availability</h3><label className="mt-2 flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={inStockOnly} onChange={(event) => setInStockOnly(event.target.checked)} className="h-4 w-4 accent-emerald-800" />In stock only</label></div>
+    <div><label htmlFor="minimum-rating" className="text-sm font-bold text-slate-900">Minimum rating</label><select id="minimum-rating" className="input mt-2" value={minimumRating} onChange={(event) => setMinimumRating(event.target.value)}><option value="0">Any rating</option><option value="4">4 stars & up</option><option value="4.5">4.5 stars & up</option></select></div>
+    <div><label htmlFor="product-sort" className="text-sm font-bold text-slate-900">Sort by</label><select id="product-sort" className="input mt-2" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="featured">Featured</option><option value="price-low">Price: low to high</option><option value="price-high">Price: high to low</option><option value="name">Name</option></select></div>
+  </div>;
 
   return (
     <div className="pb-20">
@@ -58,7 +104,8 @@ const Home = () => {
         <div className="section-shell py-8 sm:py-12 lg:py-16">
           <div className="grid items-center gap-8 lg:grid-cols-[1.1fr_0.9fr]">
             <div className="space-y-6">
-              <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 shadow-sm">
+              <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 shadow-sm">
+                <Sparkles size={12} />
                 Fresh arrivals · Curated essentials
               </span>
 
@@ -129,8 +176,15 @@ const Home = () => {
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
-            {categories.map(([category, count]) => (
-              <div key={category} className="group relative overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-soft">
+            {categories.map((category) => (
+              <button
+                key={category}
+                type="button"
+                onClick={() => handleCategoryChange(category)}
+                className={`group relative overflow-hidden rounded-[26px] border text-left shadow-sm transition hover:-translate-y-1 hover:shadow-soft ${
+                  selectedCategory === category ? 'border-slate-900 ring-2 ring-slate-200' : 'border-slate-200 bg-white'
+                }`}
+              >
                 <div className="relative h-56 overflow-hidden">
                   <img
                     src={categoryImages[category] || heroImage}
@@ -139,11 +193,11 @@ const Home = () => {
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-900/20 to-transparent" />
                   <div className="absolute inset-x-0 bottom-0 p-4 text-white">
-                    <p className="text-xs uppercase tracking-[0.14em] text-slate-200">{count} products</p>
+                    <p className="text-xs uppercase tracking-[0.14em] text-slate-200">{category === 'All' ? products.length : (products.filter((product) => (product.category || 'General') === category).length)} products</p>
                     <h3 className="mt-2 text-2xl font-bold">{category}</h3>
                   </div>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         )}
@@ -156,15 +210,23 @@ const Home = () => {
             <h2 className="mt-2 text-3xl font-bold text-slate-900 sm:text-4xl">Featured Products</h2>
           </div>
           <form className="flex w-full max-w-md items-center gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:max-w-sm" onSubmit={handleSearch}>
+            <Search size={18} className="ml-2 text-slate-500" />
             <input
               type="text"
               placeholder="Search products..."
-              className="input border-0 bg-transparent px-3 py-2.5 shadow-none focus:ring-0"
+              className="input border-0 bg-transparent px-1 py-2.5 shadow-none focus:ring-0"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
             <button type="submit" className="btn btn-primary whitespace-nowrap">Search</button>
           </form>
+        </div>
+
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600">
+            <SlidersHorizontal size={15} /> Filtered by: {selectedCategory}
+          </span>
+          <button type="button" onClick={() => setFilterOpen(true)} className="btn btn-secondary gap-2 lg:hidden"><SlidersHorizontal size={16} />Filters</button>
         </div>
 
         {toast && (
@@ -188,20 +250,29 @@ const Home = () => {
               </div>
             ))}
           </div>
-        ) : products.length === 0 ? (
+        ) : loadError ? (
+          <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-8 text-center"><h3 className="text-lg font-bold text-slate-900">We could not load the catalog</h3><p className="mt-2 text-sm text-rose-800">{loadError}</p><button type="button" className="btn btn-secondary mt-4" onClick={() => load(search)}>Try again</button></div>
+        ) : visibleProducts.length === 0 ? (
           <div className="rounded-[28px] border border-dashed border-slate-300 bg-white p-12 text-center shadow-sm">
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-2xl">⌕</div>
             <h3 className="text-2xl font-bold text-slate-900">No products found</h3>
-            <p className="mt-2 text-slate-500">Try a broader search or check back later for fresh arrivals.</p>
+            <p className="mt-2 text-slate-500">Try a broader search or switch category to see more items.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
-            {featuredProducts.map((product) => (
-              <ProductCard key={product._id} product={product} onAdded={showToast} />
-            ))}
+          <div className="grid items-start gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
+            <aside className="sticky top-24 hidden rounded-2xl border border-slate-200 bg-white p-4 lg:block">{filterPanel}</aside>
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">{visibleProducts.map((product) => <ProductCard key={product._id} product={product} onAdded={showToast} />)}</div>
           </div>
         )}
       </section>
+
+      <div className={`fixed inset-0 z-[60] transition ${filterOpen ? 'visible' : 'invisible pointer-events-none'}`}>
+        <button aria-label="Close filters" className={`absolute inset-0 bg-slate-950/45 transition-opacity ${filterOpen ? 'opacity-100' : 'opacity-0'}`} onClick={() => setFilterOpen(false)} />
+        <aside className={`absolute inset-y-0 right-0 w-[min(88vw,360px)] overflow-y-auto bg-white p-5 shadow-2xl transition-transform ${filterOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+          <div className="mb-6 flex items-center justify-between"><h2 className="text-lg font-bold">Filters</h2><button onClick={() => setFilterOpen(false)} aria-label="Close filters" className="rounded-lg p-2 text-slate-600 hover:bg-slate-100"><X size={19} /></button></div>
+          {filterPanel}<button className="btn btn-primary mt-7 w-full" onClick={() => setFilterOpen(false)}>Show {visibleProducts.length} products</button>
+        </aside>
+      </div>
     </div>
   );
 };

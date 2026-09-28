@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -11,10 +11,13 @@
 
   body {
     @apply bg-slate-50 text-slate-900 antialiased;
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: 'Manrope', system-ui, sans-serif;
   }
 
-  h1, h2, h3, h4 {
+  h1,
+  h2,
+  h3,
+  h4 {
     @apply font-sans font-semibold tracking-tight text-slate-900;
   }
 
@@ -33,7 +36,7 @@
   }
 
   .btn-primary {
-    @apply bg-slate-900 text-white shadow-sm hover:bg-slate-800;
+    @apply bg-emerald-800 text-white shadow-sm hover:bg-emerald-900;
   }
 
   .btn-secondary {
@@ -45,7 +48,7 @@
   }
 
   .card {
-    @apply rounded-2xl border border-slate-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.04)];
+    @apply rounded-2xl border border-slate-200 bg-white shadow-soft;
   }
 
   .input {
@@ -68,7 +71,38 @@
     @apply rounded-2xl border border-white/50 bg-white/75 backdrop-blur-xl;
   }
 
+  .admin-shell {
+    @apply rounded-[30px] border border-slate-200 bg-white/80 shadow-soft backdrop-blur-sm;
+  }
+
+  .admin-card {
+    @apply rounded-[26px] border border-slate-200 bg-white shadow-soft;
+  }
+
+  .admin-badge {
+    @apply inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em];
+  }
+
+  .table-chip {
+    @apply inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold;
+  }
+
   .section-shell {
     @apply mx-auto max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+
+  .app-content {
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+  }
+
+  .app-footer {
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+  }
+
+  @media (min-width: 1024px) {
+    .app-content,
+    .app-footer {
+      padding-bottom: 0;
+    }
   }
 }

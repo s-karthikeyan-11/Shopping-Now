@@ -12,7 +12,16 @@ const adminRoutes = require('./routes/adminRoutes');
 connectDB();
 
 const app = express();
-app.use(cors({ origin: process.env.CLIENT_URL || '*' }));
+const configuredClientOrigin = process.env.CLIENT_URL;
+app.use(cors({
+  origin: (origin, callback) => {
+    const isLocalDevelopmentOrigin = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin || '');
+    if (!origin || !configuredClientOrigin || origin === configuredClientOrigin || isLocalDevelopmentOrigin) {
+      return callback(null, true);
+    }
+    return callback(new Error('Origin is not allowed by CORS'));
+  },
+}));
 app.use(express.json());
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));

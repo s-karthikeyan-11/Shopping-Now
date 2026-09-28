@@ -1,0 +1,30 @@
+import React, { useEffect, useState } from 'react';
+import { CheckCircle2, PackageCheck } from 'lucide-react';
+import { Link, useLocation, useParams } from 'react-router-dom';
+import api from '../api/axios';
+
+const OrderDetails = () => {
+  const { id } = useParams();
+  const location = useLocation();
+  const [order, setOrder] = useState(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => { api.get(`/orders/${id}`).then(({ data }) => setOrder(data)).catch((err) => setError(err.response?.data?.message || 'Could not load this order')); }, [id]);
+
+  if (error) return <div className="section-shell py-16 text-center"><h1 className="text-2xl font-bold">Order unavailable</h1><p className="mt-2 text-slate-600">{error}</p><Link className="btn btn-primary mt-5" to="/orders">View my orders</Link></div>;
+  if (!order) return <div className="section-shell py-16"><div className="mx-auto h-64 max-w-2xl animate-pulse rounded-2xl bg-slate-200" /></div>;
+
+  const originalSubtotal = order.items.reduce((sum, item) => sum + Number(item.price || 0) * item.quantity, 0);
+  const discount = order.items.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.discountPercent || 0) / 100 * item.quantity, 0);
+
+  return <div className="section-shell py-8 sm:py-12">
+    {location.state?.success && <div className="mx-auto mb-8 max-w-3xl rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-center"><CheckCircle2 size={34} className="mx-auto text-emerald-700" /><p className="mt-3 text-xs font-bold uppercase tracking-[0.16em] text-emerald-800">Order confirmed</p><h1 className="mt-2 text-2xl font-bold">Thank you for your order</h1><p className="mt-2 text-sm text-slate-600">Your order ID is <strong>#{order._id.toUpperCase()}</strong></p><div className="mt-5 flex flex-wrap justify-center gap-3"><Link className="btn btn-primary" to="/orders">Track order</Link><Link className="btn btn-secondary" to="/products">Continue shopping</Link></div></div>}
+    <div className="mx-auto max-w-3xl"><div className="mb-6 flex flex-col justify-between gap-3 sm:flex-row sm:items-end"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-800">Order details</p><h1 className="mt-2 text-3xl font-bold">#{order._id.toUpperCase()}</h1></div><span className="w-fit rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">{order.status}</span></div>
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7"><div className="flex items-center gap-3"><PackageCheck size={20} className="text-emerald-800" /><h2 className="text-lg font-bold">Items in this order</h2></div><div className="mt-5 divide-y divide-slate-100">{order.items.map((item, index) => <div key={`${item.product}-${index}`} className="flex items-center justify-between gap-4 py-4"><div className="min-w-0"><p className="font-semibold">{item.name}</p><p className="mt-1 text-sm text-slate-500">Quantity {item.quantity}</p></div><span className="shrink-0 font-semibold">₹{Number(item.lineTotal || 0).toFixed(2)}</span></div>)}</div>
+        <div className="mt-4 grid gap-6 border-t border-slate-200 pt-5 sm:grid-cols-2"><div><h3 className="text-sm font-semibold">Delivery address</h3><p className="mt-2 text-sm leading-6 text-slate-600">{order.shippingAddress?.line1}<br />{order.shippingAddress?.city}, {order.shippingAddress?.state} {order.shippingAddress?.pincode}<br />{order.shippingAddress?.phone}</p></div><div><h3 className="text-sm font-semibold">Payment method</h3><p className="mt-2 text-sm text-slate-600">{order.paymentMethod || 'Cash on Delivery'}</p></div></div>
+        <div className="mt-6 space-y-3 border-t border-slate-200 pt-4 text-sm"><div className="flex justify-between text-slate-600"><span>Subtotal</span><span>₹{originalSubtotal.toFixed(2)}</span></div><div className="flex justify-between text-emerald-800"><span>Discount</span><span>−₹{discount.toFixed(2)}</span></div><div className="flex justify-between text-slate-600"><span>Tax</span><span>₹{Number(order.totalGst || 0).toFixed(2)}</span></div><div className="flex justify-between text-slate-600"><span>Delivery fee</span><span>{Number(order.deliveryFee || 0) === 0 ? 'Free' : `₹${Number(order.deliveryFee).toFixed(2)}`}</span></div><div className="flex justify-between border-t border-slate-200 pt-3 text-lg font-bold"><span>Total</span><span>₹{Number(order.totalAmount).toFixed(2)}</span></div></div>
+      </section></div>
+  </div>;
+};
+
+export default OrderDetails;

@@ -1,11 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const { protect } = require('../middleware/auth');
+const { protect, customerOnly } = require('../middleware/auth');
 const { placeOrder, getMyOrders, getOrderById } = require('../controllers/orderController');
 
-router.use(protect); // login required to order
+router.use(protect);
 
-router.post('/', placeOrder);
+router.post('/', customerOnly, placeOrder);
 router.get('/', getMyOrders);
 router.get('/:id', getOrderById);
 

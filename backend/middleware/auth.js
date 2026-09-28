@@ -26,4 +26,9 @@ const adminOnly = (req, res, next) => {
   return res.status(403).json({ message: 'Admin access required' });
 };
 
-module.exports = { protect, adminOnly };
+const customerOnly = (req, res, next) => {
+  if (req.user && req.user.role !== 'admin') return next();
+  return res.status(403).json({ message: 'Only customers can place orders' });
+};
+
+module.exports = { protect, adminOnly, customerOnly };

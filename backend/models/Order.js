@@ -21,6 +21,12 @@ const orderSchema = new mongoose.Schema(
     subtotal: { type: Number, required: true },
     totalGst: { type: Number, required: true },
     totalAmount: { type: Number, required: true },
+    deliveryFee: { type: Number, default: 0, min: 0 },
+    paymentMethod: {
+      type: String,
+      enum: ['UPI', 'Credit/Debit Card', 'Net Banking', 'Cash on Delivery'],
+      default: 'Cash on Delivery',
+    },
     shippingAddress: {
       line1: { type: String, default: '' },
       city: { type: String, default: '' },

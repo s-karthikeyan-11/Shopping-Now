@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 
@@ -7,6 +8,7 @@ const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [remember, setRemember] = useState(true);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const { login } = useAuth();
@@ -19,9 +21,9 @@ const Login = () => {
     setError('');
     setSubmitting(true);
     try {
-      const user = await login(email, password);
+      const user = await login(email, password, remember);
       await refreshCart();
-      navigate(user.role === 'admin' ? '/admin' : location.state?.from || '/');
+      navigate(user.role === 'admin' ? '/admin' : location.state?.from?.pathname || location.state?.from || '/');
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed');
     } finally {
@@ -83,13 +85,22 @@ const Login = () => {
                   />
                   <button
                     type="button"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-500 hover:text-slate-700"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
                     onClick={() => setShowPassword((value) => !value)}
                   >
-                    {showPassword ? 'Hide' : 'Show'}
+                    {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
                   </button>
                 </div>
               </label>
+
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <label className="flex items-center gap-2 text-slate-600">
+                  <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} className="h-4 w-4 rounded border-slate-300 accent-emerald-800" />
+                  Remember me
+                </label>
+                <span title="Password recovery is not configured for this store" className="text-slate-400">Forgot password?</span>
+              </div>
 
               <button className="btn btn-primary w-full" type="submit" disabled={submitting}>
                 {submitting ? 'Logging in...' : 'Log in'}
@@ -98,7 +109,7 @@ const Login = () => {
 
             <p className="mt-6 text-center text-sm text-slate-600">
               No account yet?{' '}
-              <Link to="/register" className="font-semibold text-slate-900 underline-offset-4 hover:underline">
+              <Link to="/register" state={{ from: location.state?.from }} className="font-semibold text-slate-900 underline-offset-4 hover:underline">
                 Create one
               </Link>
             </p>

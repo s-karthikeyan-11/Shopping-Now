@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import api from '../api/axios';
 import { useAuth } from './AuthContext';
 
@@ -23,6 +23,10 @@ export const CartProvider = ({ children }) => {
       // ignore - user may not be logged in yet
     }
   }, [user]);
+
+  useEffect(() => {
+    refreshCart();
+  }, [refreshCart]);
 
   const addToCart = async (productId, quantity = 1) => {
     const { data } = await api.post('/cart', { productId, quantity });

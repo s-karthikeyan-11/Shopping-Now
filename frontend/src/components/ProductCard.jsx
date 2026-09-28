@@ -1,18 +1,33 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { Eye, Heart, ShoppingCart, Star } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 
 const fallbackImage = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=900&q=80';
 
-const ProductCard = ({ product, onAdded }) => {
+const ProductCard = ({ product, onAdded, onWishlistChange }) => {
   const { user, isAdmin } = useAuth();
   const { addToCart } = useCart();
   const navigate = useNavigate();
   const [imageSrc, setImageSrc] = useState(product.image || product.imageUrl || product.imageURL || fallbackImage);
+  const [isWishlisted, setIsWishlisted] = useState(false);
   const outOfStock = Number(product.stock) <= 0;
-  const rating = product.rating || 4.8;
+  const rating = Number(product.rating || 4.8);
   const reviewCount = product.reviewCount || 128;
+
+  useEffect(() => {
+    const saved = JSON.parse(localStorage.getItem('shopnowWishlist') || '[]');
+    setIsWishlisted(saved.includes(product._id));
+  }, [product._id]);
+
+  const handleWishlistToggle = () => {
+    const saved = JSON.parse(localStorage.getItem('shopnowWishlist') || '[]');
+    const next = isWishlisted ? saved.filter((id) => id !== product._id) : [...saved, product._id];
+    localStorage.setItem('shopnowWishlist', JSON.stringify(next));
+    setIsWishlisted(!isWishlisted);
+    onWishlistChange?.();
+  };
 
   const handleAdd = async () => {
     if (!user) {
@@ -29,11 +44,9 @@ const ProductCard = ({ product, onAdded }) => {
 
   const salePercent = Math.max(Number(product.discountPercent || 0), 0);
   const price = Number(product.price || 0);
-  const originalPrice = Number(product.finalPrice || price).toFixed(2);
-  const displayPrice = salePercent > 0 ? Number(product.finalPrice || price) : Number(product.finalPrice || price);
 
   return (
-    <article className="group overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_12px_35px_rgba(15,23,42,0.06)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_20px_40px_rgba(15,23,42,0.1)]">
+    <article className="group flex h-full min-h-[410px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.05)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_16px_36px_rgba(15,23,42,0.11)]">
       <div className="relative overflow-hidden">
         <div className="absolute inset-x-3 top-3 z-10 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -46,9 +59,17 @@ const ProductCard = ({ product, onAdded }) => {
           <button
             type="button"
             aria-label="Save item"
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-white/80 bg-white/80 text-slate-700 shadow-sm backdrop-blur-sm transition hover:border-slate-200 hover:text-rose-500"
+            className={`flex h-9 w-9 items-center justify-center rounded-full border shadow-sm backdrop-blur-sm transition ${
+              isWishlisted
+                ? 'border-rose-200 bg-rose-50 text-rose-500'
+                : 'border-white/80 bg-white/80 text-slate-700 hover:border-slate-200 hover:text-rose-500'
+            }`}
+            onClick={handleWishlistToggle}
           >
-            ♥
+            <Heart size={16} fill={isWishlisted ? 'currentColor' : 'none'} />
+          </button>
+          <button type="button" aria-label={`View ${product.name}`} title="Quick view" className="absolute right-12 top-0 flex h-9 w-9 items-center justify-center rounded-full border border-white/80 bg-white/85 text-slate-700 shadow-sm backdrop-blur-sm transition hover:text-emerald-800" onClick={() => navigate(`/product/${product._id}`)}>
+            <Eye size={16} />
           </button>
         </div>
 
@@ -71,17 +92,17 @@ const ProductCard = ({ product, onAdded }) => {
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-slate-500">{product.category || 'General'}</p>
-            <h3 className="mt-2 line-clamp-2 text-lg font-semibold text-slate-900">{product.name}</h3>
+            <button type="button" onClick={() => navigate(`/product/${product._id}`)} className="mt-2 line-clamp-2 min-h-12 text-left text-base font-semibold text-slate-900 hover:text-emerald-800">{product.name}</button>
           </div>
         </div>
 
         <div className="flex items-center gap-2 text-sm text-slate-500">
-          <span className="text-amber-500">★</span>
+          <Star size={14} className="fill-amber-400 text-amber-400" />
           <span className="font-medium text-slate-700">{rating.toFixed(1)}</span>
           <span>({reviewCount}+ reviews)</span>
         </div>
 
-        <div className="flex items-end gap-2">
+        <div className="mt-auto flex items-end gap-2">
           <span className="text-2xl font-bold text-slate-900">₹{Number(product.finalPrice || 0).toFixed(2)}</span>
           {salePercent > 0 && <span className="pb-1 text-sm text-slate-400 line-through">₹{Number(price).toFixed(2)}</span>}
         </div>
@@ -94,10 +115,11 @@ const ProductCard = ({ product, onAdded }) => {
         {!isAdmin && (
           <button
             type="button"
-            className="btn btn-primary w-full"
+            className="btn btn-primary w-full gap-2"
             disabled={outOfStock}
             onClick={handleAdd}
           >
+            <ShoppingCart size={16} />
             {user ? 'Add to Cart' : 'Log in to buy'}
           </button>
         )}
