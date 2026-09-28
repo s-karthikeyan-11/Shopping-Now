@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Search, SlidersHorizontal, Sparkles, X } from 'lucide-react';
-import { useLocation, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../api/axios';
 import ProductCard from '../components/ProductCard';
 
@@ -15,6 +15,7 @@ const categoryImages = {
 
 const Home = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState(searchParams.get('search') || '');
@@ -46,22 +47,32 @@ const Home = () => {
 
   useEffect(() => {
     const query = searchParams.get('search') || '';
+    const category = searchParams.get('category') || 'All';
     setSearch(query);
-    setSelectedCategory('All');
+    setSelectedCategory(category);
     load(query);
   }, [location.pathname, location.search]);
 
   useEffect(() => {
-    if (location.pathname === '/categories') document.getElementById('categories')?.scrollIntoView({ behavior: 'smooth' });
-  }, [location.pathname, loading]);
+    const target = location.hash.slice(1) || (location.pathname === '/categories' ? 'categories' : '');
+    if (target) document.getElementById(target)?.scrollIntoView({ behavior: 'smooth' });
+  }, [location.pathname, location.hash, loading]);
 
   const handleSearch = (e) => {
     e.preventDefault();
-    load(search);
+    const params = new URLSearchParams();
+    if (search.trim()) params.set('search', search.trim());
+    if (selectedCategory !== 'All') params.set('category', selectedCategory);
+    navigate(`/products${params.size ? `?${params}` : ''}#shop`);
   };
 
   const handleCategoryChange = (category) => {
     setSelectedCategory(category);
+    const params = new URLSearchParams(location.search);
+    params.delete('search');
+    if (category === 'All') params.delete('category');
+    else params.set('category', category);
+    navigate(`/products${params.size ? `?${params}` : ''}#shop`);
   };
 
   const showToast = (name) => {
