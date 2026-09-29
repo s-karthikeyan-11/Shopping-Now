@@ -39,7 +39,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     setUser(null);
-    void api.post('/auth/logout').catch(() => {});
+    void api.post('/auth/logout').catch(() => { });
   };
 
   return (

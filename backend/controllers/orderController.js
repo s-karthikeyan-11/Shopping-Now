@@ -1,6 +1,7 @@
 const Order = require('../models/Order');
 const User = require('../models/User');
 const Product = require('../models/Product');
+const mongoose = require('mongoose');
 
 const errorStatus = (err) => (err.name === 'ValidationError' || err.name === 'CastError' ? 400 : 500);
 
@@ -57,7 +58,13 @@ exports.placeOrder = async (req, res) => {
     const lock = await User.findOneAndUpdate(
       {
         _id: req.user._id,
-        $or: [{ checkoutLock: null }, { checkoutLock: { $exists: false } }, { checkoutLock: { $lt: staleLock } }],
+        // null also matches an older document that has no checkoutLock field.
+        // Mark the static server-side operator trusted so Mongoose's global
+        // filter sanitization preserves it.
+        $or: [
+          { checkoutLock: null },
+          { checkoutLock: mongoose.trusted({ $lt: staleLock }) },
+        ],
       },
       { $set: { checkoutLock: new Date() } },
       { new: false }
@@ -110,7 +117,13 @@ exports.placeOrder = async (req, res) => {
 
       // Conditional, atomic decrement: concurrent checkouts cannot make stock negative.
       const updatedProduct = await Product.findOneAndUpdate(
-        { _id: product._id, isActive: true, stock: { $gte: cartItem.quantity } },
+        {
+          _id: product._id,
+          isActive: true,
+          // cartItem.quantity was read from the validated cart; trust only this
+          // operator object so sanitizeFilter does not cast it as a number.
+          stock: mongoose.trusted({ $gte: cartItem.quantity }),
+        },
         { $inc: { stock: -cartItem.quantity } },
         { new: true }
       );
