@@ -11,6 +11,8 @@ const getClientOrigins = () =>
     .map((origin) => origin.trim())
     .filter(Boolean);
 
+const getCookieSameSite = () => (process.env.COOKIE_SAME_SITE || 'lax').trim().toLowerCase();
+
 const validateEnvironment = () => {
   const missing = ['MONGO_URI', 'JWT_SECRET'].filter((key) => !process.env[key]);
   if (missing.length) throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
@@ -24,6 +26,9 @@ const validateEnvironment = () => {
   if (isProduction && getClientOrigins().length === 0) {
     throw new Error('CLIENT_URL must be configured in production');
   }
+  if (!['lax', 'strict', 'none'].includes(getCookieSameSite())) {
+    throw new Error('COOKIE_SAME_SITE must be one of: lax, strict, none');
+  }
 };
 
-module.exports = { getClientOrigins, validateEnvironment };
+module.exports = { getClientOrigins, getCookieSameSite, validateEnvironment };

@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
+import { readStoredArray, writeStoredValue } from '../utils/storage';
 
 const ProductDetails = () => {
   const { id } = useParams();
@@ -13,17 +14,19 @@ const ProductDetails = () => {
   const [product, setProduct] = useState(null);
   const [error, setError] = useState('');
   const [added, setAdded] = useState(false);
-  const [wishlisted, setWishlisted] = useState(() => JSON.parse(localStorage.getItem('shopnowWishlist') || '[]').includes(id));
+  const [wishlisted, setWishlisted] = useState(() => readStoredArray('shopnowWishlist').includes(id));
 
   useEffect(() => {
     setProduct(null);
+    setError('');
+    setWishlisted(readStoredArray('shopnowWishlist').includes(id));
     api.get(`/products/${id}`).then(({ data }) => setProduct(data)).catch((err) => setError(err.response?.data?.message || 'Could not load this product'));
   }, [id]);
 
   const toggleWishlist = () => {
-    const saved = JSON.parse(localStorage.getItem('shopnowWishlist') || '[]');
+    const saved = readStoredArray('shopnowWishlist');
     const next = wishlisted ? saved.filter((savedId) => savedId !== id) : [...saved, id];
-    localStorage.setItem('shopnowWishlist', JSON.stringify(next));
+    writeStoredValue('shopnowWishlist', next);
     setWishlisted(!wishlisted);
   };
 

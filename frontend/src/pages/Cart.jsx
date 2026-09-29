@@ -2,11 +2,12 @@ import React, { useMemo, useState } from 'react';
 import { Heart, Minus, Plus, ShoppingBag, Trash2, Truck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import { readStoredArray, writeStoredValue } from '../utils/storage';
 
 const Cart = () => {
   const { items, total, updateQuantity, removeFromCart } = useCart();
   const [error, setError] = useState('');
-  const [wishlist, setWishlist] = useState(() => JSON.parse(localStorage.getItem('shopnowWishlist') || '[]'));
+  const [wishlist, setWishlist] = useState(() => readStoredArray('shopnowWishlist'));
   const navigate = useNavigate();
 
   const subtotal = useMemo(
@@ -28,7 +29,7 @@ const Cart = () => {
 
   const toggleWishlist = (productId) => {
     const next = wishlist.includes(productId) ? wishlist.filter((id) => id !== productId) : [...wishlist, productId];
-    localStorage.setItem('shopnowWishlist', JSON.stringify(next));
+    writeStoredValue('shopnowWishlist', next);
     setWishlist(next);
   };
 

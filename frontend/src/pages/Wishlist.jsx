@@ -2,18 +2,19 @@ import React, { useEffect, useState } from 'react';
 import { Heart } from 'lucide-react';
 import api from '../api/axios';
 import ProductCard from '../components/ProductCard';
+import { readStoredArray } from '../utils/storage';
 
 const Wishlist = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [savedIds, setSavedIds] = useState(() => JSON.parse(localStorage.getItem('shopnowWishlist') || '[]'));
+  const [savedIds, setSavedIds] = useState(() => readStoredArray('shopnowWishlist'));
 
   useEffect(() => {
     api.get('/products').then(({ data }) => setProducts(data)).catch(() => setProducts([])).finally(() => setLoading(false));
   }, []);
 
   const saved = products.filter((product) => savedIds.includes(product._id));
-  const syncSaved = () => setSavedIds(JSON.parse(localStorage.getItem('shopnowWishlist') || '[]'));
+  const syncSaved = () => setSavedIds(readStoredArray('shopnowWishlist'));
 
   return <div className="section-shell py-8 sm:py-12">
     <div className="mb-8"><p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-800">Saved for later</p><h1 className="mt-2 text-3xl font-bold sm:text-4xl">Your wishlist</h1></div>

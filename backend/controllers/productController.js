@@ -1,13 +1,22 @@
 const Product = require('../models/Product');
+const mongoose = require('mongoose');
 
 const errorStatus = (err) => (err.name === 'ValidationError' || err.name === 'CastError' ? 400 : 500);
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const getQueryText = (value) => (typeof value === 'string' ? value.trim() : '');
 
 // GET /api/products  (public) - list active products, with optional search/category filter
 exports.getProducts = async (req, res) => {
   try {
-    const { search, category } = req.query;
+    const search = getQueryText(req.query.search);
+    const category = getQueryText(req.query.category);
+    if (search.length > 100 || category.length > 60) {
+      return res.status(400).json({ message: 'Search and category filters are too long' });
+    }
     const filter = { isActive: true };
-    if (search) filter.name = { $regex: search, $options: 'i' };
+    // sanitizeFilter is globally enabled. This operator object is safe because
+    // the user input is escaped before it becomes part of the regular expression.
+    if (search) filter.name = mongoose.trusted({ $regex: escapeRegex(search), $options: 'i' });
     if (category) filter.category = category;
     const products = await Product.find(filter).sort({ createdAt: -1 });
     res.json(products);

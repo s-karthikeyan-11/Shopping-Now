@@ -2,10 +2,10 @@ const mongoose = require('mongoose');
 
 const productSchema = new mongoose.Schema(
   {
-    name: { type: String, required: true, trim: true },
-    description: { type: String, default: '' },
-    category: { type: String, default: 'General', trim: true },
-    image: { type: String, default: '' },
+    name: { type: String, required: true, trim: true, maxlength: 160 },
+    description: { type: String, default: '', maxlength: 4000 },
+    category: { type: String, default: 'General', trim: true, maxlength: 60 },
+    image: { type: String, default: '', maxlength: 2048 },
     price: { type: Number, required: true, min: 0 }, // base price before discount/GST
     discountPercent: { type: Number, default: 0, min: 0, max: 100 },
     gstPercent: { type: Number, default: 0, min: 0, max: 100 },
@@ -30,5 +30,6 @@ productSchema.virtual('finalPrice').get(function () {
 
 productSchema.set('toJSON', { virtuals: true });
 productSchema.set('toObject', { virtuals: true });
+productSchema.index({ isActive: 1, category: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Product', productSchema);

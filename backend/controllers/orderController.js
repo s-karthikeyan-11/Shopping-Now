@@ -25,6 +25,7 @@ const validateShippingAddress = (value) => {
   );
 
   if (Object.values(address).some((field) => !field)) return null;
+  if (address.line1.length > 180 || address.city.length > 80 || address.state.length > 80) return null;
   if (!/^\d{6}$/.test(address.pincode)) return null;
   if (!/^[0-9+()\-\s]{7,20}$/.test(address.phone)) return null;
   return address;
@@ -195,6 +196,9 @@ exports.getOrderById = async (req, res) => {
 exports.adminGetOrders = async (req, res) => {
   try {
     const { status } = req.query;
+    if (status && !Object.hasOwn(STATUS_TRANSITIONS, status)) {
+      return res.status(400).json({ message: 'Invalid status filter' });
+    }
     const filter = status ? { status } : {};
     const orders = await Order.find(filter).populate('user', 'name email').sort({ createdAt: -1 });
     res.json(orders);
@@ -216,16 +220,30 @@ exports.updateOrderStatus = async (req, res) => {
       return res.status(400).json({ message: `Cannot change ${order.status} orders to ${status}` });
     }
 
-    // A cancelled order is terminal, so its items can only be restocked once.
-    if (status === 'Cancelled') {
-      for (const item of order.items) {
-        await Product.findByIdAndUpdate(item.product, { $inc: { stock: item.quantity } });
+    // Compare-and-set makes a concurrent update fail rather than double-restock stock.
+    const updatedOrder = await Order.findOneAndUpdate(
+      { _id: order._id, status: order.status },
+      { $set: { status } },
+      { new: true, runValidators: true }
+    );
+    if (!updatedOrder) {
+      return res.status(409).json({ message: 'This order was updated by another administrator. Refresh and try again.' });
+    }
+
+    // The status change is claimed first. Cancelled is terminal, so only the
+    // administrator that wins the compare-and-set can restore inventory.
+    if (status === 'Cancelled' && order.items.length) {
+      try {
+        await Product.bulkWrite(order.items.map((item) => ({
+          updateOne: { filter: { _id: item.product }, update: { $inc: { stock: item.quantity } } },
+        })));
+      } catch (err) {
+        await Order.updateOne({ _id: order._id, status: 'Cancelled' }, { $set: { status: order.status } });
+        throw err;
       }
     }
 
-    order.status = status;
-    await order.save();
-    res.json(order);
+    res.json(updatedOrder);
   } catch (err) {
     res.status(errorStatus(err)).json({ message: 'Failed to update order status' });
   }

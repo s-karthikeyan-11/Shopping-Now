@@ -1,15 +1,32 @@
-import React, { useEffect, useState } from 'react';
-import { AlertTriangle, ArrowUpRight, PackageCheck, TrendingUp } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { AlertTriangle, ArrowUpRight, PackageCheck } from 'lucide-react';
 import api from '../../api/axios';
+import { Link } from 'react-router-dom';
 
 const Dashboard = () => {
   const [stats, setStats] = useState(null);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    api.get('/admin/dashboard').then(({ data }) => setStats(data));
+  const loadDashboard = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const { data } = await api.get('/admin/dashboard');
+      setStats(data);
+    } catch (requestError) {
+      setStats(null);
+      setError(requestError.response?.data?.message || 'The dashboard could not be loaded. Check that the API is running and try again.');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  if (!stats) {
+  useEffect(() => {
+    void loadDashboard();
+  }, [loadDashboard]);
+
+  if (loading) {
     return (
       <div className="space-y-4">
         <div className="h-8 w-36 animate-pulse rounded bg-slate-200" />
@@ -22,7 +39,19 @@ const Dashboard = () => {
     );
   }
 
+  if (error || !stats) {
+    return (
+      <div role="alert" className="rounded-[24px] border border-rose-200 bg-rose-50 p-6 text-rose-900">
+        <h2 className="text-xl font-bold">Dashboard unavailable</h2>
+        <p className="mt-2 text-sm text-rose-700">{error || 'The dashboard did not return any data.'}</p>
+        <button type="button" className="btn btn-primary mt-5" onClick={loadDashboard}>Try again</button>
+      </div>
+    );
+  }
+
   const statuses = ['Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled'];
+  const ordersByStatus = stats.ordersByStatus || {};
+  const lowStockProducts = Array.isArray(stats.lowStockProducts) ? stats.lowStockProducts : [];
   const statusColors = {
     Pending: 'bg-amber-100 text-amber-700',
     Processing: 'bg-sky-100 text-sky-700',
@@ -30,6 +59,11 @@ const Dashboard = () => {
     Delivered: 'bg-emerald-100 text-emerald-700',
     Cancelled: 'bg-rose-100 text-rose-700',
   };
+  const totalOrders = Number(stats.totalOrders || 0);
+  const deliveredOrders = Number(ordersByStatus.Delivered || 0);
+  const activeFulfillment = ['Pending', 'Processing', 'Shipped']
+    .reduce((sum, status) => sum + Number(ordersByStatus[status] || 0), 0);
+  const deliveryCompletion = totalOrders ? Math.round((deliveredOrders / totalOrders) * 100) : 0;
 
   return (
     <div>
@@ -39,9 +73,9 @@ const Dashboard = () => {
           <h2 className="mt-2 text-2xl font-bold text-slate-900 sm:text-[28px]">Dashboard</h2>
         </div>
         <div className="flex items-center gap-3">
-          <span className="admin-badge border-slate-200 bg-slate-50 text-slate-600">Updated today</span>
+          <span className="admin-badge border-slate-200 bg-slate-50 text-slate-600">Live store data</span>
           <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-emerald-700">
-            <TrendingUp size={12} /> +12.4% vs last week
+            <PackageCheck size={12} /> {activeFulfillment} active fulfillment{activeFulfillment === 1 ? '' : 's'}
           </span>
         </div>
       </div>
@@ -69,7 +103,7 @@ const Dashboard = () => {
         <div>
           <div className="mb-4 flex items-center justify-between gap-3">
             <h3 className="text-xl font-bold text-slate-900">Orders by status</h3>
-            <span className="text-sm text-slate-500">Last 30 days</span>
+            <span className="text-sm text-slate-500">All orders</span>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
@@ -78,7 +112,7 @@ const Dashboard = () => {
                 <div className="flex items-center justify-between gap-2">
                   <span className={`admin-badge ${statusColors[s]}`}>{s}</span>
                 </div>
-                <div className="mt-5 text-3xl font-bold text-slate-900">{stats.ordersByStatus[s] || 0}</div>
+                <div className="mt-5 text-3xl font-bold text-slate-900">{ordersByStatus[s] || 0}</div>
               </div>
             ))}
           </div>
@@ -93,29 +127,29 @@ const Dashboard = () => {
           <div className="mt-5 space-y-4 text-sm">
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
               <div className="flex items-center justify-between text-slate-600">
-                <span>Stock health</span>
-                <span className="font-semibold text-emerald-700">91%</span>
+                <span>Products needing restock</span>
+                <span className={`font-semibold ${lowStockProducts.length ? 'text-amber-700' : 'text-emerald-700'}`}>{lowStockProducts.length}</span>
               </div>
               <div className="mt-2 h-2 rounded-full bg-slate-200">
-                <div className="h-2 w-[91%] rounded-full bg-emerald-500" />
+                <div className={`h-2 rounded-full ${lowStockProducts.length ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: lowStockProducts.length ? '100%' : '0%' }} />
               </div>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
               <div className="flex items-center justify-between text-slate-600">
-                <span>Fulfillment rate</span>
-                <span className="font-semibold text-violet-700">87%</span>
+                <span>Delivery completion</span>
+                <span className="font-semibold text-violet-700">{deliveryCompletion}%</span>
               </div>
               <div className="mt-2 h-2 rounded-full bg-slate-200">
-                <div className="h-2 w-[87%] rounded-full bg-violet-500" />
+                <div className="h-2 rounded-full bg-violet-500" style={{ width: `${deliveryCompletion}%` }} />
               </div>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
               <div className="flex items-center justify-between text-slate-600">
-                <span>Customer satisfaction</span>
-                <span className="font-semibold text-amber-700">4.9/5</span>
+                <span>Orders delivered</span>
+                <span className="font-semibold text-emerald-700">{deliveredOrders}</span>
               </div>
               <div className="mt-2 h-2 rounded-full bg-slate-200">
-                <div className="h-2 w-[96%] rounded-full bg-amber-500" />
+                <div className="h-2 rounded-full bg-emerald-500" style={{ width: `${deliveryCompletion}%` }} />
               </div>
             </div>
           </div>
@@ -130,7 +164,7 @@ const Dashboard = () => {
           </span>
         </div>
 
-        {stats.lowStockProducts.length === 0 ? (
+        {lowStockProducts.length === 0 ? (
           <div className="mt-4 rounded-[24px] border border-dashed border-slate-300 bg-slate-50 p-6 text-slate-600">
             No products are low on stock.
           </div>
@@ -146,7 +180,7 @@ const Dashboard = () => {
                 </tr>
               </thead>
               <tbody>
-                {stats.lowStockProducts.map((p) => (
+                {lowStockProducts.map((p) => (
                   <tr key={p._id}>
                     <td className="table-td font-medium text-slate-800">{p.name}</td>
                     <td className="table-td">
@@ -154,9 +188,9 @@ const Dashboard = () => {
                     </td>
                     <td className="table-td">{p.lowStockThreshold}</td>
                     <td className="table-td">
-                      <button type="button" className="inline-flex items-center gap-1 text-sm font-semibold text-slate-900 hover:text-slate-700">
-                        Reorder <ArrowUpRight size={14} />
-                      </button>
+                      <Link to="/admin/products" className="inline-flex items-center gap-1 text-sm font-semibold text-slate-900 hover:text-slate-700">
+                        Manage stock <ArrowUpRight size={14} />
+                      </Link>
                     </td>
                   </tr>
                 ))}

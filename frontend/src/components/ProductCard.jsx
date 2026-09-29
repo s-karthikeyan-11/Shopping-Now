@@ -3,6 +3,7 @@ import { Eye, Heart, ShoppingCart, Star } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
+import { readStoredArray, writeStoredValue } from '../utils/storage';
 
 const fallbackImage = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=900&q=80';
 
@@ -17,14 +18,14 @@ const ProductCard = ({ product, onAdded, onWishlistChange }) => {
   const reviewCount = product.reviewCount || 128;
 
   useEffect(() => {
-    const saved = JSON.parse(localStorage.getItem('shopnowWishlist') || '[]');
+    const saved = readStoredArray('shopnowWishlist');
     setIsWishlisted(saved.includes(product._id));
   }, [product._id]);
 
   const handleWishlistToggle = () => {
-    const saved = JSON.parse(localStorage.getItem('shopnowWishlist') || '[]');
+    const saved = readStoredArray('shopnowWishlist');
     const next = isWishlisted ? saved.filter((id) => id !== product._id) : [...saved, product._id];
-    localStorage.setItem('shopnowWishlist', JSON.stringify(next));
+    writeStoredValue('shopnowWishlist', next);
     setIsWishlisted(!isWishlisted);
     onWishlistChange?.();
   };

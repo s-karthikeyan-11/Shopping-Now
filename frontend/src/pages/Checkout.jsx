@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Banknote, Check, Truck } from 'lucide-react';
 import api from '../api/axios';
 import { useCart } from '../context/CartContext';
+import { readStoredObject, writeStoredValue } from '../utils/storage';
 
 const steps = ['Delivery address', 'Payment method', 'Order review'];
 const paymentOptions = [
@@ -13,7 +14,7 @@ const emptyAddress = { line1: '', city: '', state: '', pincode: '', phone: '' };
 const Checkout = () => {
   const { items, total, refreshCart, clearCartLocal } = useCart();
   const [step, setStep] = useState(0);
-  const [address, setAddress] = useState(() => JSON.parse(localStorage.getItem('shopnowAddress') || 'null') || emptyAddress);
+  const [address, setAddress] = useState(() => ({ ...emptyAddress, ...readStoredObject('shopnowAddress') }));
   const [paymentMethod, setPaymentMethod] = useState('Cash on Delivery');
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState('');
@@ -37,7 +38,7 @@ const Checkout = () => {
       setError('Complete every delivery address field to continue.');
       return;
     }
-    localStorage.setItem('shopnowAddress', JSON.stringify(address));
+    writeStoredValue('shopnowAddress', address);
     setStep(1);
   };
 

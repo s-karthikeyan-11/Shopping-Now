@@ -7,19 +7,22 @@ const errorStatus = (err) => (err.name === 'ValidationError' || err.name === 'Ca
 // GET /api/admin/dashboard
 exports.getDashboard = async (req, res) => {
   try {
-    const [totalUsers, totalProducts, totalOrders, deliveredOrders, lowStockProducts] = await Promise.all([
+    const [totalUsers, totalProducts, totalOrders, salesSummary, lowStockProducts, statusCounts] = await Promise.all([
       User.countDocuments({ role: 'user' }),
       Product.countDocuments(),
       Order.countDocuments(),
-      Order.find({ status: 'Delivered' }),
-      Product.find({ $expr: { $lte: ['$stock', '$lowStockThreshold'] } }).select('name stock lowStockThreshold'),
+      Order.aggregate([
+        { $match: { status: 'Delivered' } },
+        { $group: { _id: null, totalSales: { $sum: '$totalAmount' } } },
+      ]),
+      Product.aggregate([
+        { $match: { $expr: { $lte: ['$stock', '$lowStockThreshold'] } } },
+        { $project: { name: 1, stock: 1, lowStockThreshold: 1 } },
+      ]),
+      Order.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
     ]);
 
-    const totalSales = deliveredOrders.reduce((sum, o) => sum + o.totalAmount, 0);
-
-    const statusCounts = await Order.aggregate([
-      { $group: { _id: '$status', count: { $sum: 1 } } },
-    ]);
+    const totalSales = salesSummary[0]?.totalSales || 0;
 
     res.json({
       totalUsers,
