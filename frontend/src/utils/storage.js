@@ -13,8 +13,8 @@ export const readStoredArray = (key) => {
 };
 
 export const readStoredObject = (key) => {
-  const value = readStoredValue(key, {});
-  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+      const value = readStoredValue(key, {});
+        return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 };
 
 export const writeStoredValue = (key, value) => {

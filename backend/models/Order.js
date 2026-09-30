@@ -24,9 +24,19 @@ const orderSchema = new mongoose.Schema(
     deliveryFee: { type: Number, default: 0, min: 0 },
     paymentMethod: {
       type: String,
-      enum: ['UPI', 'Credit/Debit Card', 'Net Banking', 'Cash on Delivery'],
+      enum: ['UPI', 'Credit/Debit Card', 'Net Banking', 'Razorpay', 'Cash on Delivery'],
       default: 'Cash on Delivery',
     },
+    paymentStatus: {
+      type: String,
+      enum: ['Pending', 'Paid', 'Failed'],
+      default: 'Pending',
+    },
+    // Gateway identifiers are stored only after the server creates/verifies them.
+    razorpayOrderId: { type: String, unique: true, sparse: true },
+    razorpayPaymentId: { type: String, unique: true, sparse: true },
+    razorpaySignature: { type: String, select: false },
+    paidAt: { type: Date },
     shippingAddress: {
       line1: { type: String, default: '' },
       city: { type: String, default: '' },
@@ -36,14 +46,14 @@ const orderSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled'],
+      enum: ['Awaiting Payment', 'Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled'],
       default: 'Pending',
     },
   },
   { timestamps: true }
 );
 
-orderSchema.index({ user: 1, createdAt: -1 });
-orderSchema.index({ status: 1, createdAt: -1 });
+orderSchema.index({ user: 1, createdAt: -1 });        // user's orders sorted by creation date //
+orderSchema.index({ status: 1, createdAt: -1 });       // orders sorted by status and creation date in admin //
 
 module.exports = mongoose.model('Order', orderSchema);

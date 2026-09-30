@@ -20,7 +20,8 @@ const ProductDetails = () => {
     setProduct(null);
     setError('');
     setWishlisted(readStoredArray('shopnowWishlist').includes(id));
-    api.get(`/products/${id}`).then(({ data }) => setProduct(data)).catch((err) => setError(err.response?.data?.message || 'Could not load this product'));
+    api.get(`/products/${id}`).then(({ data }) => setProduct(data))
+    .catch((err) => setError(err.response?.data?.message || 'Could not load this product'));
   }, [id]);
 
   const toggleWishlist = () => {

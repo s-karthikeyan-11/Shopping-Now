@@ -8,7 +8,7 @@ A full-stack e-commerce app built with MongoDB, Express, React, and Node.
 - Browse products with price, discount %, GST %, computed final price, and stock
 - Register / log in (JWT auth)
 - Add products to cart, update quantity, remove items (login required)
-- Place orders and view order history with live status
+- Place Cash on Delivery or Razorpay orders and view order history with live status
 
 **Admin**
 - Dashboard: total users, products, orders, sales, and low-stock products
@@ -76,7 +76,7 @@ npm run dev                 # starts on http://localhost:3000
 | POST | /api/auth/register, /api/auth/login | Public |
 | GET | /api/products, /api/products/:id | Public |
 | GET/POST/PUT/DELETE | /api/cart | Logged-in user |
-| POST /api/orders, GET /api/orders | Logged-in user |
+| POST /api/orders, POST /api/orders/razorpay, POST /api/orders/razorpay/verify, GET /api/orders | Logged-in user |
 | GET | /api/admin/dashboard | Admin |
 | POST/PUT/DELETE | /api/admin/products | Admin |
 | GET | /api/admin/orders | Admin |
@@ -88,5 +88,5 @@ npm run dev                 # starts on http://localhost:3000
 
 - Passwords are hashed with bcrypt and browser sessions use httpOnly JWT cookies. In production, serve both apps over HTTPS, set `NODE_ENV=production`, use a 32+ character random `JWT_SECRET`, and configure `CLIENT_URL` (multiple origins may be comma-separated).
 - The API applies security headers, a 20 KB JSON body limit, and separate authentication/API rate limits. Set `TRUST_PROXY=1` only when deployed behind one trusted reverse proxy.
-- No payment gateway is wired in, so checkout currently accepts Cash on Delivery only. Add Razorpay/Stripe confirmation before enabling online methods.
+- Razorpay orders are created from server-calculated cart totals. The backend verifies the Checkout HMAC signature and Razorpay's captured payment status before marking an order paid. Set `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` in `backend/.env`; use test keys until you complete Razorpay's go-live checks.
 - No image upload — the product form takes an image URL. Add multer + cloud storage if you need file uploads.

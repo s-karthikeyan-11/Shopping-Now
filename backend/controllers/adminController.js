@@ -10,7 +10,7 @@ exports.getDashboard = async (req, res) => {
     const [totalUsers, totalProducts, totalOrders, salesSummary, lowStockProducts, statusCounts] = await Promise.all([
       User.countDocuments({ role: 'user' }),
       Product.countDocuments(),
-      Order.countDocuments(),
+      Order.countDocuments({ status: { $ne: 'Awaiting Payment' } }),
       Order.aggregate([
         { $match: { status: 'Delivered' } },
         { $group: { _id: null, totalSales: { $sum: '$totalAmount' } } },

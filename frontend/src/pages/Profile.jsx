@@ -8,7 +8,7 @@ const Profile = () => {
   const navigate = useNavigate();
   const links = [
     { label: 'Orders', detail: 'View and track your purchases', to: '/orders', icon: Package },
-    { label: 'Wishlist', detail: 'Your saved products', to: '/wishlist', icon: Heart },
+    ...(user?.role !== 'admin' ? [{ label: 'Wishlist', detail: 'Your saved products', to: '/wishlist', icon: Heart }] : []),
     { label: 'Addresses', detail: 'Your latest delivery address', to: '/checkout', icon: MapPin },
     { label: 'Payment methods', detail: 'Choose a method at checkout', to: '/checkout', icon: CreditCard },
     { label: 'Settings', detail: 'Account preferences', to: '/profile', icon: Settings },

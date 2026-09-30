@@ -14,9 +14,16 @@ exports.getProducts = async (req, res) => {
       return res.status(400).json({ message: 'Search and category filters are too long' });
     }
     const filter = { isActive: true };
-    // sanitizeFilter is globally enabled. This operator object is safe because
-    // the user input is escaped before it becomes part of the regular expression.
-    if (search) filter.name = mongoose.trusted({ $regex: escapeRegex(search), $options: 'i' });
+    // sanitizeFilter is globally enabled. Search across the fields customers
+    // can see, using an escaped regular expression so search text is literal.
+    if (search) {
+      const searchPattern = new RegExp(escapeRegex(search), 'i');
+      filter.$or = mongoose.trusted([
+        { name: searchPattern },
+        { description: searchPattern },
+        { category: searchPattern },
+      ]);
+    }
     if (category) filter.category = category;
     const products = await Product.find(filter).sort({ createdAt: -1 });
     res.json(products);

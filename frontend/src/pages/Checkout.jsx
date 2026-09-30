@@ -1,15 +1,38 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Banknote, Check, Truck } from 'lucide-react';
+import { ArrowLeft, Banknote, Check, CreditCard, Truck } from 'lucide-react';
 import api from '../api/axios';
 import { useCart } from '../context/CartContext';
 import { readStoredObject, writeStoredValue } from '../utils/storage';
 
 const steps = ['Delivery address', 'Payment method', 'Order review'];
 const paymentOptions = [
+  { id: 'Razorpay', label: 'Online payment', detail: 'Pay securely with UPI, card, net banking, or wallet.', icon: CreditCard },
   { id: 'Cash on Delivery', label: 'Cash on Delivery', detail: 'Pay when your order is delivered.', icon: Banknote },
 ];
 const emptyAddress = { line1: '', city: '', state: '', pincode: '', phone: '' };
+
+const loadRazorpayCheckout = () => new Promise((resolve, reject) => {
+  if (window.Razorpay) {
+    resolve();
+    return;
+  }
+
+  const existingScript = document.querySelector('script[data-razorpay-checkout]');
+  if (existingScript) {
+    existingScript.addEventListener('load', () => resolve(), { once: true });
+    existingScript.addEventListener('error', () => reject(new Error('Razorpay Checkout could not be loaded')), { once: true });
+    return;
+  }
+
+  const script = document.createElement('script');
+  script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+  script.async = true;
+  script.dataset.razorpayCheckout = 'true';
+  script.onload = () => resolve();
+  script.onerror = () => reject(new Error('Razorpay Checkout could not be loaded'));
+  document.body.appendChild(script);
+});
 
 const Checkout = () => {
   const { items, total, refreshCart, clearCartLocal } = useCart();
@@ -18,6 +41,8 @@ const Checkout = () => {
   const [paymentMethod, setPaymentMethod] = useState('Cash on Delivery');
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState('');
+  const paymentSucceeded = useRef(false);
+  const cancellationStarted = useRef(false);
   const navigate = useNavigate();
 
   const summary = useMemo(() => {
@@ -42,9 +67,102 @@ const Checkout = () => {
     setStep(1);
   };
 
+  const cancelRazorpayOrder = async (orderId) => {
+    if (cancellationStarted.current || paymentSucceeded.current) return;
+    cancellationStarted.current = true;
+    try {
+      await api.post(`/orders/${orderId}/payment/cancel`);
+      await refreshCart();
+    } finally {
+      cancellationStarted.current = false;
+    }
+  };
+
+  const payWithRazorpay = async () => {
+    let checkoutOpened = false;
+    let localOrderId = '';
+
+    try {
+      const { data } = await api.post('/orders/razorpay', { shippingAddress: address });
+      localOrderId = data.orderId;
+      await loadRazorpayCheckout();
+
+      const abandonPayment = async (message) => {
+        if (paymentSucceeded.current || cancellationStarted.current) return;
+        try {
+          await cancelRazorpayOrder(localOrderId);
+          setError(message);
+        } catch (cancelError) {
+          setError(cancelError.response?.data?.message || 'We could not cancel the pending payment. Please check your orders.');
+        } finally {
+          setPlacing(false);
+        }
+      };
+
+      const razorpay = new window.Razorpay({
+        key: data.keyId,
+        amount: data.razorpayOrder.amount,
+        currency: data.razorpayOrder.currency,
+        name: 'SHOP-NOW',
+        description: `Order #${data.orderId.slice(-6).toUpperCase()}`,
+        order_id: data.razorpayOrder.id,
+        prefill: { contact: address.phone },
+        notes: { localOrderId: data.orderId },
+        theme: { color: '#065f46' },
+        handler: async (response) => {
+          paymentSucceeded.current = true;
+          try {
+            const { data: verified } = await api.post('/orders/razorpay/verify', {
+              orderId: data.orderId,
+              ...response,
+            });
+            clearCartLocal();
+            await refreshCart();
+            navigate(`/order/${verified.order._id}`, { state: { success: true } });
+          } catch (verificationError) {
+            setError(verificationError.response?.data?.message || 'Your payment was received, but confirmation is still pending. Please check your orders before trying again.');
+          } finally {
+            setPlacing(false);
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            void abandonPayment('Payment was cancelled. Your items have been returned to your bag.');
+          },
+        },
+      });
+
+      razorpay.on('payment.failed', () => {
+        void abandonPayment('Payment failed. Your items have been returned to your bag.');
+      });
+      checkoutOpened = true;
+      razorpay.open();
+    } catch (requestError) {
+      if (localOrderId && !paymentSucceeded.current) {
+        try {
+          await cancelRazorpayOrder(localOrderId);
+        } catch {
+          // Preserve the original checkout error. The server still has the
+          // pending order if it could not be cancelled safely.
+        }
+      }
+      setError(requestError.response?.data?.message || requestError.message || 'We could not start Razorpay payment. Please try again.');
+    } finally {
+      if (!checkoutOpened) setPlacing(false);
+    }
+  };
+
   const placeOrder = async () => {
     setError('');
     setPlacing(true);
+    paymentSucceeded.current = false;
+    cancellationStarted.current = false;
+
+    if (paymentMethod === 'Razorpay') {
+      await payWithRazorpay();
+      return;
+    }
+
     try {
       const { data } = await api.post('/orders', { shippingAddress: address, paymentMethod });
       clearCartLocal();
@@ -93,16 +211,16 @@ const Checkout = () => {
                 <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-slate-900">{label}</span><span className="mt-1 block text-xs text-slate-500">{detail}</span></span>
               </label>)}
             </div>
-            <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">Online payment processing is not configured yet. Cash on Delivery is available now.</p>
+            {paymentMethod === 'Razorpay' && <p className="mt-4 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800">Razorpay will open its secure checkout for UPI, cards, net banking, and available wallets.</p>}
             <div className="mt-6 flex flex-col gap-3 sm:flex-row"><button className="btn btn-secondary" onClick={() => setStep(0)}>Back to address</button><button className="btn btn-primary" onClick={() => setStep(2)}>Review order</button></div>
           </div>}
 
           {step === 2 && <div>
             <h2 className="text-xl font-bold">Review your order</h2><p className="mt-1 text-sm text-slate-500">Check your delivery details and items before placing.</p>
             <div className="mt-5 rounded-xl border border-slate-200 p-4"><div className="flex items-start justify-between gap-3"><h3 className="font-semibold">Delivering to</h3><button className="text-sm font-semibold text-emerald-800" onClick={() => setStep(0)}>Edit</button></div><p className="mt-2 text-sm leading-6 text-slate-600">{address.line1}<br />{address.city}, {address.state} {address.pincode}<br />{address.phone}</p></div>
-            <div className="mt-4 rounded-xl border border-slate-200 p-4"><div className="flex items-center justify-between gap-3"><h3 className="font-semibold">Payment</h3><button className="text-sm font-semibold text-emerald-800" onClick={() => setStep(1)}>Edit</button></div><p className="mt-2 text-sm text-slate-600">{paymentMethod}</p>{paymentMethod === 'Cash on Delivery' && <p className="mt-1 text-sm text-slate-500">Pay when your order is delivered.</p>}</div>
+            <div className="mt-4 rounded-xl border border-slate-200 p-4"><div className="flex items-center justify-between gap-3"><h3 className="font-semibold">Payment</h3><button className="text-sm font-semibold text-emerald-800" onClick={() => setStep(1)}>Edit</button></div><p className="mt-2 text-sm text-slate-600">{paymentMethod === 'Razorpay' ? 'Online payment via Razorpay' : paymentMethod}</p>{paymentMethod === 'Cash on Delivery' && <p className="mt-1 text-sm text-slate-500">Pay when your order is delivered.</p>}{paymentMethod === 'Razorpay' && <p className="mt-1 text-sm text-slate-500">You will be redirected to Razorpay's secure checkout.</p>}</div>
             <div className="mt-5 space-y-3">{items.map(({ product, quantity, lineTotal }) => <div key={product._id} className="flex items-center gap-3"><img src={product.image || product.imageUrl || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=160&q=80'} alt="" className="h-14 w-14 rounded-lg bg-slate-100 object-cover" /><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{product.name}</p><p className="text-xs text-slate-500">Quantity {quantity}</p></div><span className="text-sm font-semibold">₹{Number(lineTotal).toFixed(2)}</span></div>)}</div>
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row"><button className="btn btn-secondary" onClick={() => setStep(1)}>Back to payment</button><button className="btn btn-primary flex-1" onClick={placeOrder} disabled={placing}>{placing ? 'Placing order…' : `Place order · ₹${summary.total.toFixed(2)}`}</button></div>
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row"><button className="btn btn-secondary" onClick={() => setStep(1)}>Back to payment</button><button className="btn btn-primary flex-1" onClick={placeOrder} disabled={placing}>{placing ? 'Starting payment…' : `${paymentMethod === 'Razorpay' ? 'Pay securely' : 'Place order'} · ₹${summary.total.toFixed(2)}`}</button></div>
           </div>}
         </section>
 

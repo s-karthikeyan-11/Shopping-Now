@@ -33,14 +33,14 @@ const Navbar = () => {
   const navLinks = [
     { to: '/', label: 'Home', end: true },
     { to: '/categories', label: 'Categories' },
-    { to: '/products', label: 'Shop' },
+    // { to: '/products', label: 'Shop' },
   ];
 
   const mobileLinks = [
     { to: '/', label: 'Home', icon: House, end: true },
     { to: '/categories', label: 'Categories', icon: LayoutGrid },
-    { to: '/wishlist', label: 'Wishlist', icon: Heart },
-    { to: '/cart', label: 'Cart', icon: ShoppingCart, count: itemCount },
+    ...(!isAdmin ? [{ to: '/wishlist', label: 'Wishlist', icon: Heart }] : []),
+    ...(!isAdmin ? [{ to: '/cart', label: 'Cart', icon: ShoppingCart, count: itemCount }] : []),
     { to: user ? '/profile' : '/login', label: user ? 'Profile' : 'Login', icon: UserRound },
   ];
 
@@ -64,11 +64,11 @@ const Navbar = () => {
           </nav>
 
           <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
-            <Link to="/wishlist" aria-label="Wishlist" title="Wishlist" className="hidden h-10 w-10 items-center justify-center rounded-xl text-slate-700 transition hover:bg-slate-100 lg:inline-flex"><Heart size={19} /></Link>
-            <Link to="/cart" aria-label={`Cart, ${itemCount} items`} title="Cart" className="relative hidden h-10 w-10 items-center justify-center rounded-xl text-slate-700 transition hover:bg-slate-100 lg:inline-flex">
+            {!isAdmin && <Link to="/wishlist" aria-label="Wishlist" title="Wishlist" className="hidden h-10 w-10 items-center justify-center rounded-xl text-slate-700 transition hover:bg-slate-100 lg:inline-flex"><Heart size={19} /></Link>}
+            {!isAdmin && <Link to="/cart" aria-label={`Cart, ${itemCount} items`} title="Cart" className="relative hidden h-10 w-10 items-center justify-center rounded-xl text-slate-700 transition hover:bg-slate-100 lg:inline-flex">
               <ShoppingCart size={19} />
               {itemCount > 0 && <span className="absolute right-0 top-0 flex h-[18px] min-w-[18px] -translate-y-1/4 translate-x-1/4 items-center justify-center rounded-full bg-emerald-800 px-1 text-[10px] font-bold text-white">{itemCount}</span>}
-            </Link>
+            </Link>}
             {!user ? <div className="hidden items-center gap-2 lg:flex"><Link to="/login" className="btn btn-secondary px-3 py-2">Login</Link><Link to="/register" className="btn btn-primary px-3 py-2">Register</Link></div> : (
               <div className="relative hidden lg:block">
                 <button type="button" aria-expanded={profileOpen} onClick={() => setProfileOpen((open) => !open)} className="inline-flex h-10 items-center gap-2 rounded-xl px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100"><UserRound size={17} /><span>{isAdmin ? 'Admin' : 'Account'}</span></button>
@@ -83,7 +83,7 @@ const Navbar = () => {
       </header>
 
       <nav aria-label="Mobile navigation" className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgba(15,23,42,0.08)] lg:hidden">
-        <div className="mx-auto grid h-16 max-w-xl grid-cols-5">
+        <div className={`mx-auto grid h-16 max-w-xl ${isAdmin ? 'grid-cols-3' : 'grid-cols-5'}`}>
           {mobileLinks.map(({ to, label, icon: Icon, count, end }) => <NavLink key={label} to={to} end={end} className={({ isActive }) => {
             const path = location.pathname;
             const active = isActive || (label === 'Home' && ['/home', '/products', '/product'].some((route) => path === route || path.startsWith(`${route}/`))) || (label === 'Cart' && path === '/checkout') || ((label === 'Profile' || label === 'Login') && ['/profile', '/orders', '/order/', '/login', '/register'].some((route) => path === route || path.startsWith(route)));
