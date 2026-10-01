@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
+import { getProductImage, setProductImageFallback } from '../utils/productImage';
 import { readStoredArray, writeStoredValue } from '../utils/storage';
 
 const ProductDetails = () => {
@@ -42,7 +43,7 @@ const ProductDetails = () => {
   return <div className="section-shell py-8 sm:py-12">
     <button onClick={() => navigate(-1)} className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-600"><ArrowLeft size={16} />Back</button>
     <div className="grid items-start gap-8 md:grid-cols-2 md:gap-12">
-      <div className="overflow-hidden rounded-2xl bg-slate-100"><img src={product.image || product.imageUrl || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=1200&q=85'} alt={product.name} className="aspect-square w-full object-cover" /></div>
+      <div className="overflow-hidden rounded-2xl bg-slate-100"><img src={getProductImage(product)} onError={setProductImageFallback} alt={product.name} className="aspect-square w-full object-cover" /></div>
       <div className="py-2"><p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-800">{product.category || 'Collection'}</p><h1 className="mt-3 text-3xl font-bold sm:text-4xl">{product.name}</h1><div className="mt-5 flex flex-wrap items-baseline gap-3"><span className="text-3xl font-bold">₹{Number(product.finalPrice || 0).toFixed(2)}</span>{Number(product.discountPercent) > 0 && <><span className="text-slate-400 line-through">₹{Number(product.price).toFixed(2)}</span><span className="text-sm font-semibold text-emerald-800">{product.discountPercent}% off</span></>}</div><p className="mt-6 whitespace-pre-line leading-7 text-slate-600">{product.description || 'A considered everyday essential, selected for quality and lasting use.'}</p>
         <div className="mt-6 flex items-center gap-2 text-sm text-slate-600"><span className={`h-2 w-2 rounded-full ${product.stock > 0 ? 'bg-emerald-600' : 'bg-rose-500'}`} />{product.stock > 0 ? `${product.stock} available` : 'Out of stock'}</div>
         {error && <p role="alert" className="mt-4 text-sm text-rose-700">{error}</p>}

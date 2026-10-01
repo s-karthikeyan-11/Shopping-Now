@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import api from '../../api/axios';
+import { getProductImage, setProductImageFallback } from '../../utils/productImage';
 
 const emptyForm = {
   name: '', description: '', category: '', image: '',
@@ -116,8 +117,14 @@ const AdminProducts = () => {
           </div>
           <div className="space-y-1">
             <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Image URL</label>
-            <input className="input" name="image" placeholder="Image URL (optional)" value={form.image} onChange={handleChange} />
+            <input className="input" name="image" type="url" inputMode="url" maxLength="2048" placeholder="https://example.com/product.jpg" value={form.image} onChange={handleChange} />
+            <p className="text-xs text-slate-500">Use one HTTPS image URL. Leaving it blank saves a category-appropriate fallback.</p>
           </div>
+        </div>
+
+        <div className="mt-4 flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+          <img src={getProductImage(form)} onError={setProductImageFallback} alt="Product image preview" className="h-16 w-16 rounded-lg bg-slate-200 object-cover" />
+          <p className="text-sm text-slate-600">Image preview</p>
         </div>
 
         <div className="mt-3 space-y-1">

@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Heart, Minus, Plus, ShoppingBag, Trash2, Truck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import { getProductImage, setProductImageFallback } from '../utils/productImage';
 import { readStoredArray, writeStoredValue } from '../utils/storage';
 
 const Cart = () => {
@@ -70,7 +71,8 @@ const Cart = () => {
               <div className="flex flex-col gap-4 sm:flex-row">
                 <div className="h-28 w-full overflow-hidden rounded-2xl bg-slate-100 sm:w-28">
                   <img
-                    src={product.image || product.imageUrl || product.imageURL || 'https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&w=900&q=80'}
+                    src={getProductImage(product)}
+                    onError={setProductImageFallback}
                     alt={product.name}
                     className="h-full w-full object-cover"
                   />

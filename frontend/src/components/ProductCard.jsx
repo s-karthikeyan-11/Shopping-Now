@@ -3,15 +3,15 @@ import { Eye, Heart, ShoppingCart, Star } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
+import { getProductImage, PRODUCT_IMAGE_FALLBACK, setProductImageFallback } from '../utils/productImage';
 import { readStoredArray, writeStoredValue } from '../utils/storage';
-
-const fallbackImage = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=900&q=80';
 
 const ProductCard = ({ product, onAdded, onWishlistChange }) => {
   const { user, isAdmin } = useAuth();
   const { addToCart } = useCart();
   const navigate = useNavigate();
-  const [imageSrc, setImageSrc] = useState(product.image || product.imageUrl || product.imageURL || fallbackImage);
+  const productImage = getProductImage(product);
+  const [imageSrc, setImageSrc] = useState(() => productImage);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const outOfStock = Number(product.stock) <= 0;
   const rating = Number(product.rating || 4.8);
@@ -21,6 +21,10 @@ const ProductCard = ({ product, onAdded, onWishlistChange }) => {
     const saved = readStoredArray('shopnowWishlist');
     setIsWishlisted(saved.includes(product._id));
   }, [product._id]);
+
+  useEffect(() => {
+    setImageSrc(productImage);
+  }, [productImage]);
 
   const handleWishlistToggle = () => {
     const saved = readStoredArray('shopnowWishlist');
@@ -79,7 +83,10 @@ const ProductCard = ({ product, onAdded, onWishlistChange }) => {
             src={imageSrc}
             alt={product.name}
             className="h-full w-full object-cover transition duration-500 group-hover:scale-110"
-            onError={() => setImageSrc(fallbackImage)}
+            onError={(event) => {
+              setProductImageFallback(event);
+              setImageSrc(PRODUCT_IMAGE_FALLBACK);
+            }}
           />
           {outOfStock && (
             <div className="absolute inset-x-0 bottom-0 bg-slate-900/70 px-3 py-2 text-center text-xs font-medium tracking-[0.1em] text-white uppercase">

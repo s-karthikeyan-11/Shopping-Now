@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Banknote, Check, CreditCard, Truck } from 'lucide-react';
 import api from '../api/axios';
 import { useCart } from '../context/CartContext';
+import { getProductImage, setProductImageFallback } from '../utils/productImage';
 import { readStoredObject, writeStoredValue } from '../utils/storage';
 
 const steps = ['Delivery address', 'Payment method', 'Order review'];
@@ -219,7 +220,7 @@ const Checkout = () => {
             <h2 className="text-xl font-bold">Review your order</h2><p className="mt-1 text-sm text-slate-500">Check your delivery details and items before placing.</p>
             <div className="mt-5 rounded-xl border border-slate-200 p-4"><div className="flex items-start justify-between gap-3"><h3 className="font-semibold">Delivering to</h3><button className="text-sm font-semibold text-emerald-800" onClick={() => setStep(0)}>Edit</button></div><p className="mt-2 text-sm leading-6 text-slate-600">{address.line1}<br />{address.city}, {address.state} {address.pincode}<br />{address.phone}</p></div>
             <div className="mt-4 rounded-xl border border-slate-200 p-4"><div className="flex items-center justify-between gap-3"><h3 className="font-semibold">Payment</h3><button className="text-sm font-semibold text-emerald-800" onClick={() => setStep(1)}>Edit</button></div><p className="mt-2 text-sm text-slate-600">{paymentMethod === 'Razorpay' ? 'Online payment via Razorpay' : paymentMethod}</p>{paymentMethod === 'Cash on Delivery' && <p className="mt-1 text-sm text-slate-500">Pay when your order is delivered.</p>}{paymentMethod === 'Razorpay' && <p className="mt-1 text-sm text-slate-500">You will be redirected to Razorpay's secure checkout.</p>}</div>
-            <div className="mt-5 space-y-3">{items.map(({ product, quantity, lineTotal }) => <div key={product._id} className="flex items-center gap-3"><img src={product.image || product.imageUrl || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=160&q=80'} alt="" className="h-14 w-14 rounded-lg bg-slate-100 object-cover" /><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{product.name}</p><p className="text-xs text-slate-500">Quantity {quantity}</p></div><span className="text-sm font-semibold">₹{Number(lineTotal).toFixed(2)}</span></div>)}</div>
+            <div className="mt-5 space-y-3">{items.map(({ product, quantity, lineTotal }) => <div key={product._id} className="flex items-center gap-3"><img src={getProductImage(product)} onError={setProductImageFallback} alt="" className="h-14 w-14 rounded-lg bg-slate-100 object-cover" /><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{product.name}</p><p className="text-xs text-slate-500">Quantity {quantity}</p></div><span className="text-sm font-semibold">₹{Number(lineTotal).toFixed(2)}</span></div>)}</div>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row"><button className="btn btn-secondary" onClick={() => setStep(1)}>Back to payment</button><button className="btn btn-primary flex-1" onClick={placeOrder} disabled={placing}>{placing ? 'Starting payment…' : `${paymentMethod === 'Razorpay' ? 'Pay securely' : 'Place order'} · ₹${summary.total.toFixed(2)}`}</button></div>
           </div>}
         </section>

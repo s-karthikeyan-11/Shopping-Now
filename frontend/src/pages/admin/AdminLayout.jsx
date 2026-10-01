@@ -51,7 +51,7 @@ const AdminLayout = () => {
               <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-lg font-bold text-white">S</div>
               <div>
                 <p className="text-[10px] uppercase tracking-[0.22em] text-slate-400">Store</p>
-                <h2 className="mt-1 text-lg font-bold text-white">Shopfront</h2>
+                <h2 className="mt-1 text-lg font-bold text-white">Shop-Now</h2>
               </div>
             </div>
           </div>
