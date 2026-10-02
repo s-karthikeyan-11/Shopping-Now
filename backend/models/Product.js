@@ -1,11 +1,21 @@
 const mongoose = require('mongoose');
+const { DEFAULT_PRODUCT_IMAGE, isHttpsImageUrl } = require('../config/productImage');
 
 const productSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true, maxlength: 160 },
     description: { type: String, default: '', maxlength: 4000 },
     category: { type: String, default: 'General', trim: true, maxlength: 60 },
-    image: { type: String, default: '', maxlength: 2048 },
+    image: {
+      type: String,
+      default: DEFAULT_PRODUCT_IMAGE,
+      trim: true,
+      maxlength: 2048,
+      validate: {
+        validator: isHttpsImageUrl,
+        message: 'Image URL must be one valid HTTPS URL',
+      },
+    },
     price: { type: Number, required: true, min: 0 }, // base price before discount/GST
     discountPercent: { type: Number, default: 0, min: 0, max: 100 },
     gstPercent: { type: Number, default: 0, min: 0, max: 100 },

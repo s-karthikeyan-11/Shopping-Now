@@ -3,6 +3,72 @@ import { AlertTriangle, ArrowUpRight, PackageCheck } from 'lucide-react';
 import api from '../../api/axios';
 import { Link } from 'react-router-dom';
 
+const currencyFormatter = new Intl.NumberFormat('en-IN', {
+  style: 'currency',
+  currency: 'INR',
+  maximumFractionDigits: 0,
+});
+
+const SalesTrendChart = ({ data }) => {
+  if (!data || data.length === 0) {
+    return (
+      <div className="flex h-60 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 text-sm text-slate-500">
+        No sales data yet.
+      </div>
+    );
+  }
+
+  const values = data.map((entry) => Number(entry.sales || 0));
+  const maxValue = Math.max(...values, 1);
+  const chartHeight = 180;
+  const chartWidth = 560;
+  const padding = 18;
+
+  const points = values.map((value, index) => {
+    const x = padding + (index * (chartWidth - padding * 2)) / Math.max(values.length - 1, 1);
+    const y = chartHeight - padding - (value / maxValue) * (chartHeight - padding * 2);
+    return `${x},${y}`;
+  });
+
+  const areaPoints = `${points[0]} ${points.map((point) => point).join(' ')} ${chartWidth - padding},${chartHeight - padding} ${padding},${chartHeight - padding}`;
+
+  return (
+    <div className="space-y-4">
+      <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="h-52 w-full overflow-visible rounded-2xl bg-slate-50 p-2">
+        <defs>
+          <linearGradient id="salesAreaGradient" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="#7c3aed" stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
+
+        {[0, 1, 2, 3].map((step) => {
+          const y = padding + (step * (chartHeight - padding * 2)) / 3;
+          return <line key={step} x1={padding} x2={chartWidth - padding} y1={y} y2={y} stroke="#e2e8f0" strokeDasharray="4 6" />;
+        })}
+
+        <polygon points={areaPoints} fill="url(#salesAreaGradient)" />
+        <polyline points={points.join(' ')} fill="none" stroke="#7c3aed" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />
+
+        {points.map((point, index) => {
+          const [x, y] = point.split(',').map(Number);
+          return (
+            <g key={`${data[index].month}-${index}`}>
+              <circle cx={x} cy={y} r="4.5" fill="#fff" stroke="#7c3aed" strokeWidth="3" />
+            </g>
+          );
+        })}
+      </svg>
+
+      <div className="grid grid-cols-6 gap-2 text-center text-[11px] font-medium uppercase tracking-[0.12em] text-slate-500">
+        {data.map((entry) => (
+          <span key={entry.month}>{entry.month}</span>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 const Dashboard = () => {
   const [stats, setStats] = useState(null);
   const [error, setError] = useState('');
@@ -52,6 +118,8 @@ const Dashboard = () => {
   const statuses = ['Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled'];
   const ordersByStatus = stats.ordersByStatus || {};
   const lowStockProducts = Array.isArray(stats.lowStockProducts) ? stats.lowStockProducts : [];
+  const salesTrend = Array.isArray(stats.monthlySales) ? stats.monthlySales : [];
+  const topSellingProducts = Array.isArray(stats.topSellingProducts) ? stats.topSellingProducts : [];
   const statusColors = {
     Pending: 'bg-amber-100 text-amber-700',
     Processing: 'bg-sky-100 text-sky-700',
@@ -64,6 +132,10 @@ const Dashboard = () => {
   const activeFulfillment = ['Pending', 'Processing', 'Shipped']
     .reduce((sum, status) => sum + Number(ordersByStatus[status] || 0), 0);
   const deliveryCompletion = totalOrders ? Math.round((deliveredOrders / totalOrders) * 100) : 0;
+  const averageOrderValue = deliveredOrders ? Number(stats.totalSales || 0) / deliveredOrders : 0;
+  const currentMonthSales = Number(salesTrend[salesTrend.length - 1]?.sales || 0);
+  const previousMonthSales = Number(salesTrend[salesTrend.length - 2]?.sales || 0);
+  const monthOverMonthGrowth = previousMonthSales ? ((currentMonthSales - previousMonthSales) / previousMonthSales) * 100 : (currentMonthSales > 0 ? 100 : 0);
 
   return (
     <div>
@@ -152,6 +224,69 @@ const Dashboard = () => {
                 <div className="h-2 rounded-full bg-emerald-500" style={{ width: `${deliveryCompletion}%` }} />
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-8 grid gap-6 xl:grid-cols-[1.5fr_0.8fr]">
+        <div className="admin-card p-5">
+          <div className="mb-5 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Reports</p>
+              <h3 className="mt-2 text-xl font-bold text-slate-900">Sales overview</h3>
+            </div>
+            <div className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700">
+              {monthOverMonthGrowth >= 0 ? '+' : ''}{monthOverMonthGrowth.toFixed(1)}% MoM
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+              <div className="text-xs uppercase tracking-[0.12em] text-slate-500">This month</div>
+              <div className="mt-2 text-2xl font-bold text-slate-900">{currencyFormatter.format(currentMonthSales)}</div>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+              <div className="text-xs uppercase tracking-[0.12em] text-slate-500">Avg. order</div>
+              <div className="mt-2 text-2xl font-bold text-slate-900">{currencyFormatter.format(averageOrderValue)}</div>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+              <div className="text-xs uppercase tracking-[0.12em] text-slate-500">Delivered</div>
+              <div className="mt-2 text-2xl font-bold text-slate-900">{deliveredOrders}</div>
+            </div>
+          </div>
+
+          <div className="mt-6">
+            <SalesTrendChart data={salesTrend} />
+          </div>
+        </div>
+
+        <div className="admin-card p-5">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h3 className="text-xl font-bold text-slate-900">Top products</h3>
+            <span className="text-sm text-slate-500">By units sold</span>
+          </div>
+
+          <div className="space-y-3">
+            {topSellingProducts.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
+                No completed orders yet.
+              </div>
+            ) : (
+              topSellingProducts.map((product, index) => (
+                <div key={`${product.name}-${index}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-slate-800">{product.name}</p>
+                      <p className="text-xs uppercase tracking-[0.12em] text-slate-500">{product.unitsSold} sold</p>
+                    </div>
+                    <span className="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-700">
+                      #{index + 1}
+                    </span>
+                  </div>
+                  <div className="mt-2 text-sm font-semibold text-slate-700">{currencyFormatter.format(product.revenue || 0)}</div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>

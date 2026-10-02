@@ -12,6 +12,7 @@ const CHECKOUT_LOCK_TIMEOUT_MS = 5 * 60 * 1000;
 const STATUS_TRANSITIONS = {
   'Awaiting Payment': ['Cancelled'],
   Pending: ['Processing', 'Cancelled'],
+  'Cancellation Pending': [],
   Processing: ['Shipped', 'Cancelled'],
   Shipped: ['Delivered', 'Cancelled'],
   Delivered: [],
@@ -415,6 +416,93 @@ exports.cancelRazorpayPayment = async (req, res) => {
   }
 };
 
+// POST /api/orders/:id/cancel -- customer can cancel only before fulfilment starts.
+// A paid Razorpay order is refunded before inventory is returned to stock.
+exports.cancelMyOrder = async (req, res) => {
+  let claimedOrder;
+  let refund;
+
+  try {
+    const existingOrder = await Order.findOne({ _id: req.params.id, user: req.user._id });
+    if (!existingOrder) return res.status(404).json({ message: 'Order not found' });
+    if (existingOrder.status !== 'Pending') {
+      return res.status(409).json({ message: 'Only pending orders can be cancelled' });
+    }
+
+    // Claim the cancellation before contacting Razorpay. This prevents an
+    // administrator from dispatching an order while its refund is in progress.
+    claimedOrder = await Order.findOneAndUpdate(
+      { _id: existingOrder._id, user: req.user._id, status: 'Pending' },
+      { $set: { status: 'Cancellation Pending' } },
+      { new: true, runValidators: true }
+    );
+    if (!claimedOrder) {
+      return res.status(409).json({ message: 'This order was updated. Refresh and try again.' });
+    }
+
+    if (claimedOrder.paymentMethod === 'Razorpay' && claimedOrder.paymentStatus === 'Paid') {
+      if (!claimedOrder.razorpayPaymentId) {
+        throw httpError(409, 'The payment record is incomplete. Please contact support to cancel this order.');
+      }
+      refund = await razorpay.payments.refund(claimedOrder.razorpayPaymentId, {
+        amount: Math.round(claimedOrder.totalAmount * 100),
+        receipt: `refund_${claimedOrder._id}`,
+        notes: { localOrderId: claimedOrder._id.toString(), reason: 'customer_cancelled' },
+      });
+      if (refund.status === 'failed') {
+        await Order.updateOne(
+          { _id: claimedOrder._id, status: 'Cancellation Pending' },
+          {
+            $set: {
+              status: 'Pending',
+              razorpayRefundId: refund.id,
+              refundStatus: 'Failed',
+            },
+          }
+        );
+        return res.status(502).json({ message: 'Razorpay could not process the refund. Please try again later.' });
+      }
+    }
+
+    await releaseStock(claimedOrder.items);
+    const paymentUpdate = refund
+      ? {
+        paymentStatus: refund.status === 'processed' ? 'Refunded' : 'Refund Pending',
+        razorpayRefundId: refund.id,
+        refundStatus: refund.status === 'processed' ? 'Processed' : 'Pending',
+        refundInitiatedAt: new Date(),
+      }
+      : {};
+    const cancelledOrder = await Order.findOneAndUpdate(
+      { _id: claimedOrder._id, status: 'Cancellation Pending' },
+      { $set: { status: 'Cancelled', ...paymentUpdate } },
+      { new: true, runValidators: true }
+    );
+    if (!cancelledOrder) {
+      throw httpError(500, 'Order cancellation could not be finalised. Please contact support.');
+    }
+
+    res.json({
+      order: cancelledOrder,
+      message: refund
+        ? refund.status === 'processed' ? 'Order cancelled and refund processed.' : 'Order cancelled and refund initiated.'
+        : 'Order cancelled.',
+    });
+  } catch (err) {
+    // If the gateway rejected the refund before creating one, make the order
+    // available again. A created refund must never be rolled back locally.
+    if (claimedOrder && !refund) {
+      await Order.updateOne(
+        { _id: claimedOrder._id, status: 'Cancellation Pending' },
+        { $set: { status: 'Pending' } }
+      ).catch(() => {});
+    }
+    res.status(err.status || 500).json({
+      message: err.status ? err.message : 'Unable to cancel this order. Please try again later.',
+    });
+  }
+};
+
 // GET /api/orders  -- current user's order history
 exports.getMyOrders = async (req, res) => {
   try {
@@ -466,6 +554,9 @@ exports.updateOrderStatus = async (req, res) => {
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: 'Order not found' });
     if (status === order.status) return res.json(order);
+    if (status === 'Cancelled' && order.paymentMethod === 'Razorpay' && order.paymentStatus === 'Paid') {
+      return res.status(409).json({ message: 'Paid Razorpay orders must be cancelled through the refund workflow.' });
+    }
     if (!STATUS_TRANSITIONS[order.status].includes(status)) {
       return res.status(400).json({ message: `Cannot change ${order.status} orders to ${status}` });
     }

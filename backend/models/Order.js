@@ -29,7 +29,7 @@ const orderSchema = new mongoose.Schema(
     },
     paymentStatus: {
       type: String,
-      enum: ['Pending', 'Paid', 'Failed'],
+      enum: ['Pending', 'Paid', 'Failed', 'Refund Pending', 'Refunded'],
       default: 'Pending',
     },
     // Gateway identifiers are stored only after the server creates/verifies them.
@@ -37,6 +37,13 @@ const orderSchema = new mongoose.Schema(
     razorpayPaymentId: { type: String, unique: true, sparse: true },
     razorpaySignature: { type: String, select: false },
     paidAt: { type: Date },
+    razorpayRefundId: { type: String, unique: true, sparse: true },
+    refundStatus: {
+      type: String,
+      enum: ['Not Required', 'Pending', 'Processed', 'Failed'],
+      default: 'Not Required',
+    },
+    refundInitiatedAt: { type: Date },
     shippingAddress: {
       line1: { type: String, default: '' },
       city: { type: String, default: '' },
@@ -46,7 +53,7 @@ const orderSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['Awaiting Payment', 'Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled'],
+      enum: ['Awaiting Payment', 'Pending', 'Cancellation Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled'],
       default: 'Pending',
     },
   },

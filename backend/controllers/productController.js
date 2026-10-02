@@ -1,5 +1,6 @@
 const Product = require('../models/Product');
 const mongoose = require('mongoose');
+const { normalizeProductImage } = require('../config/productImage');
 
 const errorStatus = (err) => (err.name === 'ValidationError' || err.name === 'CastError' ? 400 : 500);
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -62,8 +63,14 @@ exports.createProduct = async (req, res) => {
     if (!name || price == null || stock == null) {
       return res.status(400).json({ message: 'name, price and stock are required' });
     }
+    let productImage;
+    try {
+      productImage = normalizeProductImage(image, category);
+    } catch (err) {
+      return res.status(400).json({ message: err.message });
+    }
     const product = await Product.create({
-      name, description, category, image,
+      name, description, category, image: productImage,
       price, discountPercent, gstPercent, stock, lowStockThreshold,
     });
     res.status(201).json(product);
@@ -79,6 +86,13 @@ exports.updateProduct = async (req, res) => {
       ({ name, description, category, image, price, discountPercent, gstPercent, stock, lowStockThreshold, isActive }))(req.body);
 
     Object.keys(updates).forEach((k) => updates[k] === undefined && delete updates[k]);
+    if (Object.hasOwn(updates, 'image')) {
+      try {
+        updates.image = normalizeProductImage(updates.image, updates.category);
+      } catch (err) {
+        return res.status(400).json({ message: err.message });
+      }
+    }
 
     const product = await Product.findByIdAndUpdate(req.params.id, updates, { new: true, runValidators: true });
     if (!product) return res.status(404).json({ message: 'Product not found' });
