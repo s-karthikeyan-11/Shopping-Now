@@ -1,43 +1,40 @@
-# Shopnow — MERN E-commerce (User + Admin)
+# Shopnow — Multi-Vendor Marketplace Foundation
 
-A full-stack e-commerce app built with MongoDB, Express, React, and Node.
+This project is a full-stack commerce application with a customer storefront, seller onboarding flow, admin reporting, and AI-powered marketplace support foundations. It is structured to evolve into a real-world multi-vendor marketplace while remaining compatible with the current working e-commerce base.
 
 ## Features
 
-**User**
+**Customer**
 - Browse products with price, discount %, GST %, computed final price, and stock
 - Register / log in (JWT auth)
-- Add products to cart, update quantity, remove items (login required)
-- Place Cash on Delivery or Razorpay orders and view order history with live status
+- Add products to cart, update quantity, remove items, and check out
+- Place Cash on Delivery or Razorpay orders and view order history
+- Track forward and return shipments, request returns, and view refund status
+- Apply limited-use promotions and receive eligible cashback in the wallet after paid delivery
+
+**Seller**
+- Submit seller profile and business details for review
+- Manage inventory and fulfillment orders
+- Submit verification evidence and view commission-based settlement history
 
 **Admin**
-- Dashboard: total users, products, orders, sales, and low-stock products
-- Add / edit / delete products, including price, discount %, GST %, and stock
-- View orders with customer details
-- Update delivery status: Pending → Processing → Shipped → Delivered, or Cancel (auto-restocks items)
-- Manage users: block/unblock or delete accounts
+- Dashboard: total users, products, orders, sales, low-stock items, and revenue charts
+- Add / edit / delete products
+- Review orders, returns, users, seller applications, and verification documents
+- Manage promotions, commission rates, COD reconciliation, and seller settlement references
 
-## Price calculation
+**AI-enabled marketplace foundations**
+- AI service for product and marketplace moderation analysis
+- Future-ready scaffolding for dispute evidence, quality scoring, and customer support assistance
 
-For each product: `discountedPrice = price - (price * discountPercent / 100)`,
-then `finalPrice = discountedPrice + (discountedPrice * gstPercent / 100)`.
-This is computed server-side (as a virtual on the Product model) so the frontend never
-has to duplicate the math, and it's recorded per line item at the time an order is placed
-so historical orders don't change if a product's price changes later.
+## Multi-vendor architecture
 
-## Project structure
+The application now includes:
 
-```
-backend/    Node + Express + MongoDB API (JWT auth, role-based middleware)
-frontend/   React + Vite app, Tailwind CSS, React Router, Context API for auth/cart
-```
-
-Every component and handler is written as an arrow function (`const X = () => {}` /
-`exports.x = async (req, res) => {}`), except the few spots on the Mongoose `User` and
-`Product` models (password hashing, `comparePassword`, the price virtuals) that
-deliberately use `function () {}` — those need Mongoose's own `this` binding, and
-switching them to arrow functions would silently break password hashing and price
-calculation, so that one exception is intentional, not an oversight.
+- a customer storefront for browsing and checkout
+- a seller role and onboarding workflow
+- admin reporting and review tools
+- an AI service layer for future moderation and recommendations
 
 ## Setup
 
@@ -46,47 +43,49 @@ calculation, so that one exception is intentional, not an oversight.
 ```bash
 cd backend
 npm install
-cp .env.example .env      # then edit MONGO_URI / JWT_SECRET if needed
-npm run seed               # creates an admin account + sample products
-npm run dev                 # starts on http://localhost:5000
+npm run dev
 ```
 
-Development-only seeded admin login: `admin@example.com` / `admin123`. In production, set
-`SEED_ADMIN_EMAIL` and a unique `SEED_ADMIN_PASSWORD` (12+ characters) before seeding.
-
-MongoDB: point `MONGO_URI` at a local `mongod` instance or a MongoDB Atlas connection string.
-No replica set is required — order placement uses sequential writes, not a multi-document
-transaction, so it works against a standalone MongoDB too.
-
-### 2. Frontend (React + Vite + Tailwind)
+### 2. Frontend
 
 ```bash
 cd frontend
 npm install
-cp .env.example .env       # VITE_API_URL, defaults to http://localhost:5000/api
-npm run dev                 # starts on http://localhost:3000
+npm run dev -- --host 0.0.0.0
 ```
 
-`npm run build` produces a production bundle in `frontend/dist/`.
+### 3. AI service
 
-## API overview
+```bash
+cd ai-service
+python -m venv .venv
+. .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
 
-| Method | Route | Access |
-|---|---|---|
-| POST | /api/auth/register, /api/auth/login | Public |
-| GET | /api/products, /api/products/:id | Public |
-| GET/POST/PUT/DELETE | /api/cart | Logged-in user |
-| POST /api/orders, POST /api/orders/razorpay, POST /api/orders/razorpay/verify, GET /api/orders | Logged-in user |
-| GET | /api/admin/dashboard | Admin |
-| POST/PUT/DELETE | /api/admin/products | Admin |
-| GET | /api/admin/orders | Admin |
-| PUT | /api/admin/orders/:id/status | Admin |
-| GET | /api/admin/users | Admin |
-| PUT/DELETE | /api/admin/users/:id | Admin |
+## Important routes
 
-## Notes / next steps
+- Public auth: `/api/auth/register`, `/api/auth/login`
+- Products: `/api/products`
+- Customer cart and orders: `/api/cart`, `/api/orders`
+- Coupon validation and cashback wallet: `/api/coupons/validate`, `/api/wallet`
+- Seller onboarding: `/api/sellers/apply`, `/api/sellers/me`
+- Admin dashboard: `/api/admin/dashboard`
+- Seller review: `/api/sellers/applications`, `/api/sellers/:id/status`
+- Razorpay refund webhook: `/api/webhooks/razorpay`
+- RazorpayX payout webhook: `/api/webhooks/razorpayx`
 
-- Passwords are hashed with bcrypt and browser sessions use httpOnly JWT cookies. In production, serve both apps over HTTPS, set `NODE_ENV=production`, use a 32+ character random `JWT_SECRET`, and configure `CLIENT_URL` (multiple origins may be comma-separated).
-- The API applies security headers, a 20 KB JSON body limit, and separate authentication/API rate limits. Set `TRUST_PROXY=1` only when deployed behind one trusted reverse proxy.
-- Razorpay orders are created from server-calculated cart totals. The backend verifies the Checkout HMAC signature and Razorpay's captured payment status before marking an order paid. Set `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` in `backend/.env`; use test keys until you complete Razorpay's go-live checks.
-- Product images use HTTPS URLs. The admin form previews the URL and saves a category-appropriate fallback when left blank; malformed or non-HTTPS URLs are rejected. Run `npm run repair:product-images` in `backend/` once to repair legacy blank or malformed catalog URLs.
+## Notes
+
+- Seller approvals are implemented as a foundation workflow for marketplace onboarding.
+- Configure `RAZORPAY_WEBHOOK_SECRET` in the backend environment and subscribe to Razorpay `refund.processed` and `refund.failed` events at `/api/webhooks/razorpay` for refund reconciliation.
+- RazorpayX payout variables are `RAZORPAYX_KEY_ID`, `RAZORPAYX_KEY_SECRET`, `RAZORPAYX_ACCOUNT_NUMBER`, `RAZORPAYX_PAYOUT_MODE`, and `RAZORPAYX_WEBHOOK_SECRET`. The source account must be enabled for payouts and the server IP must be allowlisted in RazorpayX.
+- Set `SELLER_PAYOUT_ENCRYPTION_KEY` to a unique 32-byte key encoded as 64 hexadecimal characters. Generate one locally with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`; do not share or commit it.
+- Before production startup, configure the encryption key and run `npm run migrate:seller-payout-data` from `backend/` once to encrypt any existing seller bank-account numbers. Keep the same key backed up securely; losing it makes encrypted payout details unrecoverable.
+- Configure the RazorpayX webhook at the public URL `/api/webhooks/razorpayx` with `RAZORPAYX_WEBHOOK_SECRET`. Subscribe to `payout.pending`, `payout.queued`, `payout.initiated`, `payout.processed`, `payout.updated`, `payout.rejected`, `payout.failed`, and `payout.reversed`.
+- Seller payouts are sent through RazorpayX when configured and are otherwise manually reconcilable only in development. RazorpayX requires a live account, enabled payouts, and server IP allowlisting.
+- Development shipping defaults to a deterministic mock adapter. Production requires `SHIPPING_PROVIDER=delhivery`, a Delhivery API token/auth header, account-specific HTTPS endpoint URLs and HTTP methods, JSON payload templates, and response field-path mappings. Templates can interpolate normalized values such as `{{order.id}}`, `{{order.shippingAddress.pincode}}`, and `{{shipment.trackingNumber}}`; configure them only from the API schema in your Delhivery account. Production startup fails if any required mapping is missing.
+- Shipment creation, tracking refresh, shipment cancellation, reverse pickup, and pickup cancellation all use the same provider adapter. If a carrier create call times out ambiguously, the order is locked for manual reconciliation instead of issuing a duplicate shipment.
+- The AI service is intentionally lightweight and can be extended into product moderation, fraud alerts, and review assistance.
+- The current codebase remains compatible with the existing storefront and admin dashboard while adding the vendor marketplace layer.

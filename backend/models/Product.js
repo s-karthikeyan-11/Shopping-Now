@@ -21,6 +21,8 @@ const productSchema = new mongoose.Schema(
     gstPercent: { type: Number, default: 0, min: 0, max: 100 },
     stock: { type: Number, required: true, min: 0, default: 0 },
     lowStockThreshold: { type: Number, default: 5, min: 0 },
+    seller: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
+    sellerName: { type: String, default: '', trim: true, maxlength: 140 },
     isActive: { type: Boolean, default: true },
   },
   { timestamps: true }

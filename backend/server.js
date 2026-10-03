@@ -12,7 +12,11 @@ const authRoutes = require('./routes/authRoutes');
 const productRoutes = require('./routes/productRoutes');
 const cartRoutes = require('./routes/cartRoutes');
 const orderRoutes = require('./routes/orderRoutes');
+const couponRoutes = require('./routes/couponRoutes');
+const walletRoutes = require('./routes/walletRoutes');
+const webhookRoutes = require('./routes/webhookRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const sellerRoutes = require('./routes/sellerRoutes');
 
 const app = express();
 const configuredClientOrigins = getClientOrigins();
@@ -52,7 +56,14 @@ app.use(cors({
   maxAge: 86400,
 }));
 app.use(cookieParser());
-app.use(express.json({ limit: '20kb' }));
+app.use(express.json({
+  limit: '20kb',
+  verify: (req, res, buffer) => {
+    if (['/api/webhooks/razorpay', '/api/webhooks/razorpayx'].includes(req.originalUrl.split('?')[0])) {
+      req.rawBody = Buffer.from(buffer);
+    }
+  },
+}));
 
 app.get('/api/health', (req, res) => {
   const databaseConnected = mongoose.connection.readyState === 1;
@@ -66,6 +77,10 @@ app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/coupons', couponRoutes);
+app.use('/api/wallet', walletRoutes);
+app.use('/api/webhooks', webhookRoutes);
+app.use('/api/sellers', sellerRoutes);
 app.use('/api/admin', adminRoutes);
 
 // 404 handler

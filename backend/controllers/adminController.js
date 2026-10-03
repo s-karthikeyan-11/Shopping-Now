@@ -76,7 +76,8 @@ exports.getDashboard = async (req, res) => {
     const [
       totalUsers,
       totalProducts,
-      totalOrders,
+      totalOrderCount,
+      awaitingPaymentCount,
       salesSummary,
       lowStockProducts,
       statusCounts,
@@ -85,7 +86,8 @@ exports.getDashboard = async (req, res) => {
     ] = await Promise.all([
       User.countDocuments({ role: 'user' }),
       Product.countDocuments(),
-      Order.countDocuments({ status: { $ne: 'Awaiting Payment' } }),
+      Order.countDocuments(),
+      Order.countDocuments({ status: 'Awaiting Payment' }),
       Order.aggregate([
         { $match: { status: 'Delivered' } },
         { $group: { _id: null, totalSales: { $sum: '$totalAmount' } } },
@@ -110,6 +112,7 @@ exports.getDashboard = async (req, res) => {
       ]),
     ]);
 
+    const totalOrders = Math.max(0, totalOrderCount - awaitingPaymentCount);
     const totalSales = salesSummary[0]?.totalSales || 0;
 
     return res.json({

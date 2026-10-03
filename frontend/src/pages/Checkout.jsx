@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Banknote, Check, CreditCard, Truck } from 'lucide-react';
+import { ArrowLeft, Banknote, Check, CreditCard, Tag, Truck } from 'lucide-react';
 import api from '../api/axios';
 import { useCart } from '../context/CartContext';
 import { getProductImage, setProductImageFallback } from '../utils/productImage';
@@ -42,6 +42,10 @@ const Checkout = () => {
   const [paymentMethod, setPaymentMethod] = useState('Cash on Delivery');
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState('');
+  const [couponInput, setCouponInput] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponError, setCouponError] = useState('');
+  const [validatingCoupon, setValidatingCoupon] = useState(false);
   const paymentSucceeded = useRef(false);
   const cancellationStarted = useRef(false);
   const navigate = useNavigate();
@@ -52,8 +56,25 @@ const Checkout = () => {
     const itemsTotal = Number(total || 0);
     const delivery = itemsTotal >= 2000 ? 0 : 99;
     const tax = Math.max(0, itemsTotal - (subtotal - discount));
-    return { subtotal, discount, tax, delivery, total: itemsTotal + delivery };
-  }, [items, total]);
+    const couponDiscount = Number(appliedCoupon?.discount || 0);
+    return { subtotal, discount, tax, delivery, couponDiscount, total: itemsTotal + delivery - couponDiscount };
+  }, [items, total, appliedCoupon]);
+
+  const applyCoupon = async (event) => {
+    event.preventDefault();
+    setCouponError('');
+    setValidatingCoupon(true);
+    try {
+      const { data } = await api.post('/coupons/validate', { code: couponInput });
+      setAppliedCoupon(data);
+      setCouponInput(data.code);
+    } catch (requestError) {
+      setAppliedCoupon(null);
+      setCouponError(requestError.response?.data?.message || 'This promotion could not be applied.');
+    } finally {
+      setValidatingCoupon(false);
+    }
+  };
 
   const updateAddress = (event) => setAddress((current) => ({ ...current, [event.target.name]: event.target.value }));
 
@@ -84,7 +105,7 @@ const Checkout = () => {
     let localOrderId = '';
 
     try {
-      const { data } = await api.post('/orders/razorpay', { shippingAddress: address });
+      const { data } = await api.post('/orders/razorpay', { shippingAddress: address, couponCode: appliedCoupon?.code });
       localOrderId = data.orderId;
       await loadRazorpayCheckout();
 
@@ -165,7 +186,7 @@ const Checkout = () => {
     }
 
     try {
-      const { data } = await api.post('/orders', { shippingAddress: address, paymentMethod });
+      const { data } = await api.post('/orders', { shippingAddress: address, paymentMethod, couponCode: appliedCoupon?.code });
       clearCartLocal();
       await refreshCart();
       navigate(`/order/${data._id}`, { state: { success: true } });
@@ -227,8 +248,23 @@ const Checkout = () => {
 
         <aside className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:sticky lg:top-28">
           <h2 className="text-lg font-bold">Order summary</h2><div className="mt-5 space-y-3 text-sm">
+            <form className="mb-5 border-b border-slate-200 pb-5" onSubmit={applyCoupon}>
+              <label className="text-sm font-semibold text-slate-800" htmlFor="checkout-coupon">Promotion code</label>
+              <div className="mt-2 flex gap-2">
+                <input id="checkout-coupon" className="input min-w-0 flex-1 uppercase" value={couponInput} onChange={(event) => { setCouponInput(event.target.value.toUpperCase()); setAppliedCoupon(null); setCouponError(''); }} maxLength={32} placeholder="Enter code" disabled={Boolean(appliedCoupon)} />
+                {appliedCoupon ? (
+                  <button type="button" className="btn btn-outline px-3" onClick={() => { setAppliedCoupon(null); setCouponInput(''); }}>Remove</button>
+                ) : (
+                  <button type="submit" className="btn btn-secondary px-3" disabled={validatingCoupon || !couponInput.trim()} aria-label="Apply promotion"><Tag size={16} />{validatingCoupon ? 'Checking…' : 'Apply'}</button>
+                )}
+              </div>
+              {couponError && <p role="alert" className="mt-2 text-xs text-rose-700">{couponError}</p>}
+              {appliedCoupon && <p className="mt-2 text-xs font-medium text-emerald-800">{appliedCoupon.code} applied</p>}
+              {appliedCoupon?.cashbackAmount > 0 && <p className="mt-1 text-xs text-emerald-800">Earn ₹{Number(appliedCoupon.cashbackAmount).toFixed(2)} cashback after delivery.</p>}
+            </form>
             <div className="flex justify-between gap-3 text-slate-600"><span>Subtotal</span><span>₹{summary.subtotal.toFixed(2)}</span></div>
             <div className="flex justify-between gap-3 text-emerald-800"><span>Discount</span><span>−₹{summary.discount.toFixed(2)}</span></div>
+            {appliedCoupon && <div className="flex justify-between gap-3 text-emerald-800"><span>Promotion ({appliedCoupon.code})</span><span>−₹{summary.couponDiscount.toFixed(2)}</span></div>}
             <div className="flex justify-between gap-3 text-slate-600"><span>Tax</span><span>₹{summary.tax.toFixed(2)}</span></div>
             <div className="flex justify-between gap-3 text-slate-600"><span>Delivery fee</span><span>{summary.delivery === 0 ? 'Free' : `₹${summary.delivery.toFixed(2)}`}</span></div>
             <div className="border-t border-slate-200 pt-3"><div className="flex justify-between gap-3 text-base font-bold"><span>Total</span><span>₹{summary.total.toFixed(2)}</span></div><p className="mt-1 text-xs text-slate-500">Including applicable taxes</p></div>

@@ -8,6 +8,7 @@ import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import PrivateRoute from './components/PrivateRoute';
 import AdminRoute from './components/AdminRoute';
+import SellerRoute from './components/SellerRoute';
 
 import Home from './pages/Home';
 import Login from './pages/Login';
@@ -20,12 +21,20 @@ import Dashboard from './pages/admin/Dashboard';
 import AdminProducts from './pages/admin/Products';
 import AdminOrders from './pages/admin/Orders';
 import AdminUsers from './pages/admin/Users';
+import AdminSellers from './pages/admin/Sellers';
+import AdminCoupons from './pages/admin/Coupons';
+import AdminPayouts from './pages/admin/Payouts';
 
 import Checkout from './pages/Checkout';
 import Profile from './pages/Profile';
 import Wishlist from './pages/Wishlist';
 import ProductDetails from './pages/ProductDetails';
 import OrderDetails from './pages/OrderDetails';
+import SellerDashboard from './pages/SellerDashboard';
+import SellerProducts from './pages/SellerProducts';
+import SellerOrders from './pages/SellerOrders';
+import SellerPayouts from './pages/SellerPayouts';
+import SellerApply from './pages/SellerApply';
 
 const App = () => (
   <AuthProvider>
@@ -119,6 +128,51 @@ const App = () => (
                 }
               />
 
+              <Route
+                path="/seller"
+                element={
+                  <SellerRoute>
+                    <SellerDashboard />
+                  </SellerRoute>
+                }
+              />
+
+              <Route
+                path="/seller/apply"
+                element={
+                  <PrivateRoute>
+                    <SellerApply />
+                  </PrivateRoute>
+                }
+              />
+
+              <Route
+                path="/seller/products"
+                element={
+                  <SellerRoute>
+                    <SellerProducts />
+                  </SellerRoute>
+                }
+              />
+
+              <Route
+                path="/seller/orders"
+                element={
+                  <SellerRoute>
+                    <SellerOrders />
+                  </SellerRoute>
+                }
+              />
+
+              <Route
+                path="/seller/payouts"
+                element={
+                  <SellerRoute>
+                    <SellerPayouts />
+                  </SellerRoute>
+                }
+              />
+
               {/* Admin */}
               <Route
                 path="/admin"
@@ -144,8 +198,23 @@ const App = () => (
                 />
 
                 <Route
+                  path="coupons"
+                  element={<AdminCoupons />}
+                />
+
+                <Route
+                  path="payouts"
+                  element={<AdminPayouts />}
+                />
+
+                <Route
                   path="users"
                   element={<AdminUsers />}
+                />
+
+                <Route
+                  path="sellers"
+                  element={<AdminSellers />}
                 />
               </Route>
 

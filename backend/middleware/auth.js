@@ -27,9 +27,14 @@ const adminOnly = (req, res, next) => {
   return res.status(403).json({ message: 'Admin access required' });
 };
 
+const sellerOnly = (req, res, next) => {
+  if (req.user && (req.user.role === 'seller' || req.user.role === 'admin')) return next();
+  return res.status(403).json({ message: 'Seller access required' });
+};
+
 const customerOnly = (req, res, next) => {
   if (req.user && req.user.role !== 'admin') return next();
   return res.status(403).json({ message: 'Only customers can place orders' });
 };
 
-module.exports = { protect, adminOnly, customerOnly };
+module.exports = { protect, adminOnly, sellerOnly, customerOnly };

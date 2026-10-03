@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BarChart3, Boxes, LayoutDashboard, Menu, ShoppingCart, Users, X } from 'lucide-react';
+import { BarChart3, Boxes, LayoutDashboard, Menu, ShoppingCart, Store, Tag, Users, WalletCards, X } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router-dom';
 
 const linkClass = ({ isActive }) =>
@@ -13,7 +13,10 @@ const navItems = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/admin/products', label: 'Products', icon: Boxes },
   { to: '/admin/orders', label: 'Orders', icon: ShoppingCart },
+  { to: '/admin/coupons', label: 'Promotions', icon: Tag },
+  { to: '/admin/payouts', label: 'Payouts', icon: WalletCards },
   { to: '/admin/users', label: 'Users', icon: Users },
+  { to: '/admin/sellers', label: 'Sellers', icon: Store },
 ];
 
 const AdminLayout = () => {

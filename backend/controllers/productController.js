@@ -6,6 +6,92 @@ const errorStatus = (err) => (err.name === 'ValidationError' || err.name === 'Ca
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const getQueryText = (value) => (typeof value === 'string' ? value.trim() : '');
 
+// GET /api/products/seller/me  (seller only)
+exports.getSellerProducts = async (req, res) => {
+  try {
+    const products = await Product.find({ seller: req.user._id }).sort({ createdAt: -1 });
+    res.json(products);
+  } catch (err) {
+    res.status(errorStatus(err)).json({ message: 'Failed to fetch seller products' });
+  }
+};
+
+// POST /api/products/seller
+exports.createSellerProduct = async (req, res) => {
+  try {
+    const { name, description, category, image, price, discountPercent, gstPercent, stock, lowStockThreshold } = req.body;
+    if (!name || price == null || stock == null) {
+      return res.status(400).json({ message: 'name, price and stock are required' });
+    }
+
+    let productImage;
+    try {
+      productImage = normalizeProductImage(image, category);
+    } catch (err) {
+      return res.status(400).json({ message: err.message });
+    }
+
+    const product = await Product.create({
+      name,
+      description,
+      category,
+      image: productImage,
+      price,
+      discountPercent,
+      gstPercent,
+      stock,
+      lowStockThreshold,
+      seller: req.user._id,
+      sellerName: req.user.name,
+    });
+
+    res.status(201).json(product);
+  } catch (err) {
+    res.status(errorStatus(err)).json({ message: 'Failed to create seller product' });
+  }
+};
+
+// PUT /api/products/seller/:id
+exports.updateSellerProduct = async (req, res) => {
+  try {
+    const product = await Product.findOne({ _id: req.params.id, seller: req.user._id });
+    if (!product) return res.status(404).json({ message: 'Seller product not found' });
+
+    const updates = (({ name, description, category, image, price, discountPercent, gstPercent, stock, lowStockThreshold, isActive }) => ({
+      name, description, category, image, price, discountPercent, gstPercent, stock, lowStockThreshold, isActive,
+    }))(req.body);
+
+    Object.keys(updates).forEach((key) => updates[key] === undefined && delete updates[key]);
+    if (Object.hasOwn(updates, 'image')) {
+      try {
+        updates.image = normalizeProductImage(updates.image, updates.category || product.category);
+      } catch (err) {
+        return res.status(400).json({ message: err.message });
+      }
+    }
+
+    Object.assign(product, updates);
+    await product.save();
+    res.json(product);
+  } catch (err) {
+    res.status(errorStatus(err)).json({ message: 'Failed to update seller product' });
+  }
+};
+
+// DELETE /api/products/seller/:id
+exports.deleteSellerProduct = async (req, res) => {
+  try {
+    const product = await Product.findOne({ _id: req.params.id, seller: req.user._id });
+    if (!product) return res.status(404).json({ message: 'Seller product not found' });
+
+    product.isActive = false;
+    await product.save();
+    res.json({ message: 'Product archived' });
+  } catch (err) {
+    res.status(errorStatus(err)).json({ message: 'Failed to archive seller product' });
+  }
+};
+
 // GET /api/products  (public) - list active products, with optional search/category filter
 exports.getProducts = async (req, res) => {
   try {
