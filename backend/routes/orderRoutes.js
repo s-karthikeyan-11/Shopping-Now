@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { protect, customerOnly, sellerOnly } = require('../middleware/auth');
+const { protect, customerOnly, approvedSellerOnly } = require('../middleware/auth');
 const {
   placeOrder,
   createRazorpayOrder,
@@ -25,10 +25,10 @@ router.post('/:id/payment/cancel', customerOnly, cancelRazorpayPayment);
 router.post('/:id/cancel', customerOnly, cancelMyOrder);
 router.post('/:id/return', customerOnly, requestOrderReturn);
 router.post('/', customerOnly, placeOrder);
-router.get('/seller', sellerOnly, getSellerOrders);
-router.post('/seller/:id/shipment', sellerOnly, createSellerShipment);
-router.post('/seller/:id/shipment/cancel', sellerOnly, cancelOrderShipment);
-router.patch('/seller/:id/status', sellerOnly, updateSellerOrderStatus);
+router.get('/seller', approvedSellerOnly, getSellerOrders);
+router.post('/seller/:id/shipment', approvedSellerOnly, createSellerShipment);
+router.post('/seller/:id/shipment/cancel', approvedSellerOnly, cancelOrderShipment);
+router.patch('/seller/:id/status', approvedSellerOnly, updateSellerOrderStatus);
 router.get('/', getMyOrders);
 router.get('/:id/tracking', getOrderTracking);
 router.get('/:id', getOrderById);

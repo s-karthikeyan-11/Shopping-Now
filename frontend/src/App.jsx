@@ -9,6 +9,7 @@ import Footer from './components/Footer';
 import PrivateRoute from './components/PrivateRoute';
 import AdminRoute from './components/AdminRoute';
 import SellerRoute from './components/SellerRoute';
+import DeliveryRoute from './components/DeliveryRoute';
 
 import Home from './pages/Home';
 import Login from './pages/Login';
@@ -24,6 +25,8 @@ import AdminUsers from './pages/admin/Users';
 import AdminSellers from './pages/admin/Sellers';
 import AdminCoupons from './pages/admin/Coupons';
 import AdminPayouts from './pages/admin/Payouts';
+import AdminFulfillment from './pages/admin/Fulfillment';
+import AdminDisputes from './pages/admin/Disputes';
 
 import Checkout from './pages/Checkout';
 import Profile from './pages/Profile';
@@ -35,6 +38,7 @@ import SellerProducts from './pages/SellerProducts';
 import SellerOrders from './pages/SellerOrders';
 import SellerPayouts from './pages/SellerPayouts';
 import SellerApply from './pages/SellerApply';
+import DeliveryDashboard from './pages/DeliveryDashboard';
 
 const App = () => (
   <AuthProvider>
@@ -173,6 +177,17 @@ const App = () => (
                 }
               />
 
+              <Route
+                path="/delivery"
+                element={
+                  <DeliveryRoute>
+                    <DeliveryDashboard />
+                  </DeliveryRoute>
+                }
+              />
+
+              <Route path="/delivery/apply" element={<PrivateRoute><DeliveryDashboard /></PrivateRoute>} />
+
               {/* Admin */}
               <Route
                 path="/admin"
@@ -216,6 +231,10 @@ const App = () => (
                   path="sellers"
                   element={<AdminSellers />}
                 />
+
+                <Route path="fulfillment" element={<AdminFulfillment />} />
+
+                <Route path="disputes" element={<AdminDisputes />} />
               </Route>
 
               {/* 404 */}

@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const AuditLog = require('../models/AuditLog');
 const Product = require('../models/Product');
 const Order = require('../models/Order');
 const mongoose = require('mongoose');
@@ -172,5 +173,22 @@ exports.deleteUser = async (req, res) => {
     res.json({ message: 'User deleted' });
   } catch (err) {
     res.status(errorStatus(err)).json({ message: 'Failed to delete user' });
+  }
+};
+
+// GET /api/admin/audit-logs
+exports.getAuditLogs = async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(Number.parseInt(req.query.limit || '100', 10) || 100, 1), 300);
+    const logs = await AuditLog.find()
+      .populate('actor', 'name email role')
+      .populate('order', '_id status')
+      .populate('package', 'packageId status')
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+    res.json(logs);
+  } catch {
+    res.status(500).json({ message: 'Failed to fetch audit logs' });
   }
 };

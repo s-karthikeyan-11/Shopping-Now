@@ -11,17 +11,24 @@ const statusClasses = {
 
 const SellerOrders = () => {
   const [orders, setOrders] = useState([]);
+  const [packages, setPackages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [shipmentBusy, setShipmentBusy] = useState('');
+  const [packageBusy, setPackageBusy] = useState('');
+  const [qrCode, setQrCode] = useState(null);
 
   const loadOrders = async () => {
     setLoading(true);
     setError('');
 
     try {
-      const { data } = await api.get('/orders/seller');
-      setOrders(data);
+      const [{ data: orderData }, { data: packageData }] = await Promise.all([
+        api.get('/orders/seller'),
+        api.get('/packages/mine'),
+      ]);
+      setOrders(orderData);
+      setPackages(packageData);
     } catch (err) {
       setError(err.response?.data?.message || 'Unable to load orders right now.');
     } finally {
@@ -82,6 +89,66 @@ const SellerOrders = () => {
     }
   };
 
+  const createPackage = async (orderId) => {
+    setPackageBusy(orderId);
+    setError('');
+    try {
+      const { data } = await api.post('/packages', { orderId });
+      setQrCode({ packageId: data.package.packageId, dataUrl: data.qrCodeDataUrl });
+      await loadOrders();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Unable to create a verified package.');
+    } finally {
+      setPackageBusy('');
+    }
+  };
+
+  const uploadPackingEvidence = async (pkg, file) => {
+    if (!file) return;
+    setPackageBusy(String(pkg._id));
+    setError('');
+    try {
+      await api.post('/evidence/upload', file, {
+        headers: {
+          'Content-Type': file.type,
+          'X-Evidence-Type': 'packing',
+          'X-Package-Id': pkg._id,
+          'X-File-Name': encodeURIComponent(file.name),
+        },
+      });
+      await loadOrders();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Unable to upload packing evidence.');
+    } finally {
+      setPackageBusy('');
+    }
+  };
+
+  const markPackageReady = async (pkg) => {
+    setPackageBusy(String(pkg._id));
+    setError('');
+    try {
+      await api.post(`/packages/${pkg._id}/ready`);
+      await loadOrders();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Unable to mark package ready.');
+    } finally {
+      setPackageBusy('');
+    }
+  };
+
+  const showQrCode = async (pkg) => {
+    setPackageBusy(String(pkg._id));
+    try {
+      const { data } = await api.get(`/packages/${pkg._id}/qr`);
+      setQrCode({ packageId: data.package.packageId, dataUrl: data.qrCodeDataUrl });
+    } catch (err) {
+      setError(err.response?.data?.message || 'Unable to load package QR code.');
+    } finally {
+      setPackageBusy('');
+    }
+  };
+
   if (loading) {
     return <div className="p-8 text-slate-500">Loading seller orders...</div>;
   }
@@ -112,6 +179,7 @@ const SellerOrders = () => {
           {orders.map((order) => {
             const fulfillment = order.sellerFulfillment;
             const fulfillmentStatus = fulfillment?.status || order.status;
+            const pkg = packages.find((item) => String(item.order?._id || item.order) === String(order._id));
             return (
             <div key={order._id} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -148,7 +216,21 @@ const SellerOrders = () => {
                   </button>
                 )}
                 {fulfillmentStatus === 'Processing' && (
-                  fulfillment?.shipmentStatus === 'Creation uncertain' ? (
+                  !pkg ? (
+                    <button type="button" onClick={() => createPackage(order._id)} disabled={packageBusy === order._id} className="rounded-xl bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50">
+                      {packageBusy === order._id ? 'Creating package…' : 'Create verified package'}
+                    </button>
+                  ) : pkg.status !== 'Ready for Dispatch' && pkg.status !== 'Assigned' ? (
+                    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-2 text-sm text-amber-900">
+                      <span className="font-semibold">{pkg.packageId} · {pkg.status}</span>
+                      <button type="button" onClick={() => showQrCode(pkg)} disabled={packageBusy === String(pkg._id)} className="rounded-lg border border-amber-300 bg-white px-2.5 py-1.5 font-medium">View QR</button>
+                      <label className="cursor-pointer rounded-lg bg-amber-700 px-2.5 py-1.5 font-medium text-white hover:bg-amber-600">
+                        {packageBusy === String(pkg._id) ? 'Uploading…' : 'Upload packing proof'}
+                        <input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm" onChange={(event) => uploadPackingEvidence(pkg, event.target.files?.[0])} />
+                      </label>
+                      <button type="button" onClick={() => markPackageReady(pkg)} disabled={packageBusy === String(pkg._id)} className="rounded-lg bg-emerald-700 px-2.5 py-1.5 font-medium text-white hover:bg-emerald-600">Ready for dispatch</button>
+                    </div>
+                  ) : fulfillment?.shipmentStatus === 'Creation uncertain' ? (
                     <p className="text-sm text-amber-700">Carrier creation needs reconciliation. Check the carrier account before retrying.</p>
                   ) : (
                     <button type="button" onClick={() => createShipment(order._id)} disabled={shipmentBusy === order._id} className="rounded-xl bg-violet-600 px-3 py-2 text-sm font-medium text-white hover:bg-violet-500 disabled:opacity-50">
@@ -161,7 +243,6 @@ const SellerOrders = () => {
                     <span className="text-sm text-slate-600">{fulfillment?.carrier}: <span className="font-mono font-semibold text-slate-900">{fulfillment?.trackingNumber}</span> · {fulfillment?.shipmentStatus}</span>
                     <button type="button" onClick={() => refreshShipment(order._id)} disabled={shipmentBusy === order._id} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50">{shipmentBusy === order._id ? 'Refreshing…' : 'Refresh tracking'}</button>
                     <button type="button" onClick={() => cancelShipment(order._id)} disabled={shipmentBusy === order._id} className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700 hover:bg-rose-100 disabled:opacity-50">{shipmentBusy === order._id ? 'Cancelling…' : 'Cancel shipment'}</button>
-                    <button type="button" onClick={() => updateStatus(order._id, 'Delivered')} className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-500">Mark Delivered</button>
                   </div>
                 )}
               </div>
@@ -170,6 +251,15 @@ const SellerOrders = () => {
             );
           })}
         </div>
+        {qrCode && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4" role="dialog" aria-modal="true" aria-label="Package QR code">
+          <div className="w-full max-w-sm rounded-3xl bg-white p-6 text-center shadow-2xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Verified package</p>
+            <h2 className="mt-2 text-xl font-bold text-slate-900">{qrCode.packageId}</h2>
+            <img className="mx-auto mt-5 h-64 w-64 rounded-xl border border-slate-200" src={qrCode.dataUrl} alt={`QR code for ${qrCode.packageId}`} />
+            <p className="mt-4 text-sm text-slate-600">Print or attach this QR code to the sealed package. Only the assigned delivery partner can verify it.</p>
+            <button type="button" className="btn btn-primary mt-5" onClick={() => setQrCode(null)}>Close</button>
+          </div>
+        </div>}
       </div>
     </div>
   );

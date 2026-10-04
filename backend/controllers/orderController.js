@@ -2,6 +2,7 @@ const Order = require('../models/Order');
 const User = require('../models/User');
 const Product = require('../models/Product');
 const Coupon = require('../models/Coupon');
+const Package = require('../models/Package');
 const SellerProfile = require('../models/SellerProfile');
 const mongoose = require('mongoose');
 const crypto = require('crypto');
@@ -661,7 +662,7 @@ exports.cancelMyOrder = async (req, res) => {
   }
 };
 
-// POST /api/orders/:id/return -- customers can request a return within seven days of delivery.
+// POST /api/orders/:id/return -- customers can request a return within 24 hours of delivery.
 exports.requestOrderReturn = async (req, res) => {
   const validReasons = ['Damaged or defective', 'Wrong item received', 'Item not as described', 'Changed my mind', 'Other'];
   const { reason } = req.body;
@@ -677,9 +678,9 @@ exports.requestOrderReturn = async (req, res) => {
     }
 
     const deliveryDate = order.deliveredAt || order.updatedAt;
-    const returnWindowMs = 7 * 24 * 60 * 60 * 1000;
+    const returnWindowMs = 24 * 60 * 60 * 1000;
     if (Date.now() - deliveryDate.getTime() > returnWindowMs) {
-      return res.status(409).json({ message: 'The seven-day return window has closed' });
+      return res.status(409).json({ message: 'The 24-hour return window has closed' });
     }
 
     const updatedOrder = await Order.findOneAndUpdate(
@@ -1132,15 +1133,15 @@ exports.getSellerOrders = async (req, res) => {
 exports.updateSellerOrderStatus = async (req, res) => {
   try {
     const { status } = req.body;
-    const validStatuses = ['Processing', 'Delivered'];
+    const validStatuses = ['Processing'];
     if (!validStatuses.includes(status)) {
-      return res.status(400).json({ message: 'Sellers must create a carrier shipment to mark an order shipped' });
+      return res.status(400).json({ message: 'Sellers may mark an order as processing; dispatch and delivery must use the verified package workflow' });
     }
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) return res.status(400).json({ message: 'Invalid order ID' });
     const order = await getSellerOwnedOrder(req.params.id, req.user._id);
     if (!order) return res.status(404).json({ message: 'Order not found for this seller' });
     const fulfillment = ensureSellerFulfillment(order, req.user._id, order.$locals.sellerItems);
-    const allowed = { Pending: ['Processing'], Processing: [], Shipped: ['Delivered'], Delivered: [] };
+    const allowed = { Pending: ['Processing'], Processing: [], Shipped: [], Delivered: [] };
     if (!allowed[fulfillment.status]?.includes(status)) {
       return res.status(409).json({ message: `Cannot change seller fulfillment from ${fulfillment.status} to ${status}` });
     }
@@ -1214,6 +1215,12 @@ exports.createSellerShipment = async (req, res) => {
     if (!order) return res.status(404).json({ message: 'Order not found for this seller' });
     const fulfillment = ensureSellerFulfillment(order, req.user._id, order.$locals.sellerItems);
     if (fulfillment.status !== 'Processing') return res.status(409).json({ message: 'Only this seller’s processing fulfillment can be shipped' });
+    const pkg = fulfillment.package
+      ? await Package.findOne({ _id: fulfillment.package, seller: req.user._id })
+      : null;
+    if (!pkg || !['Ready for Dispatch', 'Assigned'].includes(pkg.status)) {
+      return res.status(409).json({ message: 'Create a package, upload packing evidence, and mark it ready before dispatching' });
+    }
     if (['Creating', 'Creation uncertain'].includes(fulfillment.shipmentStatus)) {
       return res.status(409).json({ message: 'Shipment creation is already in progress or requires carrier reconciliation' });
     }

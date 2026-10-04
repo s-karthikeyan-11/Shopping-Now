@@ -1,5 +1,7 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const SellerProfile = require('../models/SellerProfile');
+const DeliveryPartnerProfile = require('../models/DeliveryPartnerProfile');
 
 // Verifies JWT and attaches the user to req.user
 const protect = async (req, res, next) => {
@@ -32,9 +34,47 @@ const sellerOnly = (req, res, next) => {
   return res.status(403).json({ message: 'Seller access required' });
 };
 
+// A seller role alone is not sufficient for marketplace operations. This
+// guards against an applicant publishing products before an administrator has
+// approved their business and compliance documents.
+const approvedSellerOnly = async (req, res, next) => {
+  if (!req.user) return res.status(401).json({ message: 'Not authorized' });
+  if (req.user.role === 'admin') return next();
+  if (req.user.role !== 'seller') return res.status(403).json({ message: 'Approved seller access required' });
+  try {
+    const profile = await SellerProfile.findOne({ user: req.user._id }).select('status').lean();
+    if (profile?.status !== 'approved') {
+      return res.status(403).json({ message: 'Your seller application has not been approved yet' });
+    }
+    return next();
+  } catch {
+    return res.status(500).json({ message: 'Unable to verify seller approval' });
+  }
+};
+
+const deliveryOnly = (req, res, next) => {
+  if (req.user && (req.user.role === 'delivery' || req.user.role === 'admin')) return next();
+  return res.status(403).json({ message: 'Delivery partner access required' });
+};
+
+const approvedDeliveryOnly = async (req, res, next) => {
+  if (!req.user) return res.status(401).json({ message: 'Not authorized' });
+  if (req.user.role === 'admin') return next();
+  if (req.user.role !== 'delivery') return res.status(403).json({ message: 'Approved delivery partner access required' });
+  try {
+    const profile = await DeliveryPartnerProfile.findOne({ user: req.user._id }).select('status').lean();
+    if (profile?.status !== 'approved') {
+      return res.status(403).json({ message: 'Your delivery-partner application has not been approved yet' });
+    }
+    return next();
+  } catch {
+    return res.status(500).json({ message: 'Unable to verify delivery-partner approval' });
+  }
+};
+
 const customerOnly = (req, res, next) => {
   if (req.user && req.user.role !== 'admin') return next();
   return res.status(403).json({ message: 'Only customers can place orders' });
 };
 
-module.exports = { protect, adminOnly, sellerOnly, customerOnly };
+module.exports = { protect, adminOnly, sellerOnly, approvedSellerOnly, deliveryOnly, approvedDeliveryOnly, customerOnly };

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { CheckCircle2, PackageCheck, RefreshCw } from 'lucide-react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import api from '../api/axios';
+import EvidenceDisputePanel from '../components/EvidenceDisputePanel';
 
 const RETURN_REASONS = ['Damaged or defective', 'Wrong item received', 'Item not as described', 'Changed my mind', 'Other'];
 
@@ -30,7 +31,7 @@ const OrderDetails = () => {
   const currentStep = fulfillmentSteps.indexOf(order.status);
   const returnStatus = order.returnRequest?.status || 'Not Requested';
   const deliveredOn = new Date(order.deliveredAt || order.updatedAt).getTime();
-  const returnWindowOpen = Date.now() >= deliveredOn && Date.now() - deliveredOn <= 7 * 24 * 60 * 60 * 1000;
+  const returnWindowOpen = Date.now() >= deliveredOn && Date.now() - deliveredOn <= 24 * 60 * 60 * 1000;
   const canRequestReturn = order.status === 'Delivered' && returnStatus === 'Not Requested' && returnWindowOpen;
   const deliveries = order.sellerShipments?.length
     ? order.sellerShipments
@@ -121,6 +122,7 @@ const OrderDetails = () => {
         )}
         {deliveries.map((shipment, index) => <div key={shipment._id || shipment.trackingNumber || index} className="mt-5 border-t border-slate-100 pt-4 text-sm"><p className="font-semibold text-slate-800">{deliveries.length > 1 ? `Shipment ${index + 1}` : 'Shipment details'}{shipment.seller?.name ? ` · ${shipment.seller.name}` : ''}</p><p className="mt-1 text-slate-600">{shipment.carrier || shipment.provider} · Tracking number: <span className="font-mono font-semibold text-slate-900">{shipment.trackingNumber}</span>{shipment.shipmentStatus ? ` · ${shipment.shipmentStatus}` : ''}</p>{shipment.events?.length > 0 && <ol className="mt-3 space-y-1 border-l border-slate-200 pl-3">{shipment.events.map((event, eventIndex) => <li key={`${event.status}-${eventIndex}`} className="text-xs text-slate-500">{event.status} · {new Date(event.createdAt).toLocaleString()}{event.location ? ` · ${event.location}` : ''}{event.description ? ` · ${event.description}` : ''}</li>)}</ol>}</div>)}
       </section>
+      <EvidenceDisputePanel order={order} />
       <section className="mb-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
         <h2 className="text-lg font-bold">Returns and refunds</h2>
         {canRequestReturn ? (

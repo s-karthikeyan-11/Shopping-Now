@@ -67,11 +67,8 @@ exports.applySeller = async (req, res) => {
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
-    await User.findByIdAndUpdate(req.user._id, { role: 'seller' });
-    req.user.role = 'seller';
-
     res.status(existing ? 200 : 201).json({
-      message: 'Seller application submitted successfully. The admin will review it.',
+      message: 'Seller application submitted successfully. You can publish and fulfil products after admin approval.',
       profile,
     });
   } catch (error) {

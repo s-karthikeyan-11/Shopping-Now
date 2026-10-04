@@ -43,6 +43,7 @@ exports.createSellerProduct = async (req, res) => {
       lowStockThreshold,
       seller: req.user._id,
       sellerName: req.user.name,
+      isActive: true,
     });
 
     res.status(201).json(product);
@@ -158,6 +159,7 @@ exports.createProduct = async (req, res) => {
     const product = await Product.create({
       name, description, category, image: productImage,
       price, discountPercent, gstPercent, stock, lowStockThreshold,
+      isActive: true,
     });
     res.status(201).json(product);
   } catch (err) {

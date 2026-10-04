@@ -20,6 +20,24 @@ class RiskInput(BaseModel):
     geoRisk: Optional[str] = 'low'
 
 
+class EvidenceMetadata(BaseModel):
+    mimeType: str = Field(..., min_length=3, max_length=100)
+    bytes: int = Field(..., gt=0, le=104857600)
+    sha256: str = Field(..., pattern=r'^[a-fA-F0-9]{64}$')
+
+
+class EvidenceComparisonInput(BaseModel):
+    disputeId: str = Field(..., min_length=1, max_length=100)
+    reason: str = Field(..., min_length=3, max_length=100)
+    packingEvidence: List[EvidenceMetadata] = Field(default_factory=list, max_length=20)
+    unboxingEvidence: List[EvidenceMetadata] = Field(default_factory=list, max_length=20)
+
+
+class ComplaintInput(BaseModel):
+    description: str = Field(..., min_length=10, max_length=2000)
+    reason: Optional[str] = Field(default='Other', max_length=100)
+
+
 @app.get('/health')
 def health():
     return {
@@ -58,4 +76,56 @@ def inspect_order_risk(payload: RiskInput):
             'Verify payment source and order history.',
             'Monitor repeated high-value purchases for fraud patterns.'
         ]
+    }
+
+
+@app.post('/inspect/evidence-comparison')
+def inspect_evidence_comparison(payload: EvidenceComparisonInput):
+    """Return an explicitly non-visual baseline until a validated model is deployed.
+
+    The marketplace sends evidence metadata only, never customer media, to this
+    baseline endpoint. It must not infer damage, identity, or fraud from file
+    names, hashes, or sizes.
+    """
+    return {
+        'status': 'unavailable',
+        'provider': 'baseline',
+        'confidence': 0.0,
+        'summary': (
+            f'Received metadata for {len(payload.packingEvidence)} packing and '
+            f'{len(payload.unboxingEvidence)} unboxing evidence file(s). '
+            'No visual model is configured, so no object, damage, or authenticity conclusion was made.'
+        ),
+        'limitations': [
+            'This baseline does not download or inspect image or video pixels.',
+            'File hashes only help detect later file changes; they do not prove an event occurred.',
+            'A trained, validated visual model and human review are required for evidence conclusions.'
+        ],
+        'result': {
+            'packingEvidenceCount': len(payload.packingEvidence),
+            'unboxingEvidenceCount': len(payload.unboxingEvidence),
+            'objectsDetected': [],
+            'damageObservations': [],
+        },
+    }
+
+
+@app.post('/classify/complaint')
+def classify_complaint(payload: ComplaintInput):
+    text = f'{payload.reason} {payload.description}'.lower()
+    keywords = {
+        'Damaged item': ('damage', 'damaged', 'broken', 'crack', 'defect'),
+        'Incorrect item': ('wrong', 'incorrect', 'different', 'mismatch'),
+        'Missing item': ('missing', 'empty', 'not included'),
+        'Tampered package': ('tamper', 'seal', 'opened'),
+    }
+    matches = [label for label, terms in keywords.items() if any(term in text for term in terms)]
+    return {
+        'status': 'baseline',
+        'classification': matches[0] if len(matches) == 1 else 'Other',
+        'confidence': 0.0,
+        'limitations': [
+            'This keyword baseline is not a trained classifier.',
+            'It must not determine refund eligibility or accuse a person of fraud.'
+        ],
     }

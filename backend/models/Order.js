@@ -18,6 +18,7 @@ const orderItemSchema = new mongoose.Schema(
 
 const sellerShipmentSchema = new mongoose.Schema({
   seller: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  package: { type: mongoose.Schema.Types.ObjectId, ref: 'Package', default: null },
   items: [{
     product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
     name: { type: String, required: true },

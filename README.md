@@ -14,8 +14,16 @@ This project is a full-stack commerce application with a customer storefront, se
 
 **Seller**
 - Submit seller profile and business details for review
-- Manage inventory and fulfillment orders
+- Manage inventory and fulfillment orders after approval
 - Submit verification evidence and view commission-based settlement history
+- Create a package ID and QR code, upload tamper-evident packing evidence, and mark a package ready for dispatch
+
+**Verified fulfilment and dispute review**
+- Seller packing evidence, customer unboxing evidence, and delivery proof are uploaded through a byte-validated storage boundary
+- Each evidence record stores uploader, timestamp, SHA-256 hash, package/order association, and an audit event
+- Delivery partners can be approved, assigned a package, scan its QR token, update delivery milestones, and verify the buyer delivery PIN
+- Customers can open an evidence-based dispute; AI output is explicitly advisory and never performs an automatic refund or fraud decision
+- The return-request deadline is calculated server-side from `deliveredAt`; customers have 24 hours to submit a request
 
 **Admin**
 - Dashboard: total users, products, orders, sales, low-stock items, and revenue charts
@@ -75,11 +83,15 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - Seller review: `/api/sellers/applications`, `/api/sellers/:id/status`
 - Razorpay refund webhook: `/api/webhooks/razorpay`
 - RazorpayX payout webhook: `/api/webhooks/razorpayx`
+- Packages: `/api/packages`
+- Evidence: `/api/evidence` (`POST /api/evidence/upload` uses a raw image/video request)
+- Delivery partner workflow: `/api/delivery`
+- Evidence-based disputes: `/api/disputes`
 
 ## Notes
 
 - Seller approvals are implemented as a foundation workflow for marketplace onboarding.
-- Configure `RAZORPAY_WEBHOOK_SECRET` in the backend environment and subscribe to Razorpay `refund.processed` and `refund.failed` events at `/api/webhooks/razorpay` for refund reconciliation.
+- Configure `RAZORPAY_WEBHOOK_SECRET` in the backend environment and subscribe to Razorpay `payment.captured`, `refund.processed`, and `refund.failed` events at `/api/webhooks/razorpay` for payment/refund reconciliation.
 - RazorpayX payout variables are `RAZORPAYX_KEY_ID`, `RAZORPAYX_KEY_SECRET`, `RAZORPAYX_ACCOUNT_NUMBER`, `RAZORPAYX_PAYOUT_MODE`, and `RAZORPAYX_WEBHOOK_SECRET`. The source account must be enabled for payouts and the server IP must be allowlisted in RazorpayX.
 - Set `SELLER_PAYOUT_ENCRYPTION_KEY` to a unique 32-byte key encoded as 64 hexadecimal characters. Generate one locally with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`; do not share or commit it.
 - Before production startup, configure the encryption key and run `npm run migrate:seller-payout-data` from `backend/` once to encrypt any existing seller bank-account numbers. Keep the same key backed up securely; losing it makes encrypted payout details unrecoverable.
@@ -88,4 +100,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - Development shipping defaults to a deterministic mock adapter. Production requires `SHIPPING_PROVIDER=delhivery`, a Delhivery API token/auth header, account-specific HTTPS endpoint URLs and HTTP methods, JSON payload templates, and response field-path mappings. Templates can interpolate normalized values such as `{{order.id}}`, `{{order.shippingAddress.pincode}}`, and `{{shipment.trackingNumber}}`; configure them only from the API schema in your Delhivery account. Production startup fails if any required mapping is missing.
 - Shipment creation, tracking refresh, shipment cancellation, reverse pickup, and pickup cancellation all use the same provider adapter. If a carrier create call times out ambiguously, the order is locked for manual reconciliation instead of issuing a duplicate shipment.
 - The AI service is intentionally lightweight and can be extended into product moderation, fraud alerts, and review assistance.
+- Evidence upload requires `CLOUDINARY_CLOUD_NAME` and `CLOUDINARY_EVIDENCE_UPLOAD_PRESET`. The preset must be restricted to approved media formats, a strict size limit, and private/authenticated delivery; uploads fail safely with `503` until it is configured.
+- Set `PACKAGE_SECURITY_KEY` to a separately generated 64-hex-character key in production. It encrypts delivery QR tokens and buyer delivery PINs at rest.
+- The included AI evidence endpoint is metadata-only baseline behaviour with zero confidence. It never claims to inspect pixels or make a refund/fraud decision; deploy a trained model only with documented evaluation and human review.
 - The current codebase remains compatible with the existing storefront and admin dashboard while adding the vendor marketplace layer.

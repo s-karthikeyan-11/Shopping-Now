@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import api from '../api/axios';
 
 const initialState = {
@@ -16,10 +16,10 @@ const initialState = {
 };
 
 const SellerApply = () => {
-  const navigate = useNavigate();
   const [form, setForm] = useState(initialState);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [submitted, setSubmitted] = useState(false);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -49,7 +49,7 @@ const SellerApply = () => {
       };
 
       await api.post('/sellers/apply', payload);
-      navigate('/seller');
+      setSubmitted(true);
     } catch (err) {
       setError(err.response?.data?.message || 'Seller application failed.');
     } finally {
@@ -70,7 +70,14 @@ const SellerApply = () => {
           </Link>
         </div>
 
-        <form onSubmit={handleSubmit} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        {submitted ? (
+          <section className="rounded-3xl border border-emerald-200 bg-emerald-50 p-8 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-800">Application received</p>
+            <h2 className="mt-2 text-2xl font-bold text-slate-900">Your seller account is pending review</h2>
+            <p className="mt-3 max-w-2xl text-slate-700">An administrator must approve your business before you can publish products, access seller orders, or receive payouts. We will keep your account as a customer account until then.</p>
+            <Link to="/profile" className="btn btn-primary mt-6">Back to profile</Link>
+          </section>
+        ) : <form onSubmit={handleSubmit} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           {error && <div className="mb-5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">{error}</div>}
 
           <div className="grid gap-5 md:grid-cols-2">
@@ -134,7 +141,7 @@ const SellerApply = () => {
               Cancel
             </Link>
           </div>
-        </form>
+        </form>}
       </div>
     </div>
   );

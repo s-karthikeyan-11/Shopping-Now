@@ -17,6 +17,12 @@ const walletRoutes = require('./routes/walletRoutes');
 const webhookRoutes = require('./routes/webhookRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const sellerRoutes = require('./routes/sellerRoutes');
+const packageRoutes = require('./routes/packageRoutes');
+const evidenceRoutes = require('./routes/evidenceRoutes');
+const disputeRoutes = require('./routes/disputeRoutes');
+const deliveryRoutes = require('./routes/deliveryRoutes');
+const { protect } = require('./middleware/auth');
+const { uploadEvidence } = require('./controllers/evidenceController');
 
 const app = express();
 const configuredClientOrigins = getClientOrigins();
@@ -56,6 +62,12 @@ app.use(cors({
   maxAge: 86400,
 }));
 app.use(cookieParser());
+// Raw evidence is parsed on its dedicated route before JSON parsing so the
+// server can validate the actual bytes and calculate the integrity hash.
+app.post('/api/evidence/upload', apiLimiter, protect, express.raw({
+  type: () => true,
+  limit: process.env.EVIDENCE_UPLOAD_MAX_BYTES || '10mb',
+}), uploadEvidence);
 app.use(express.json({
   limit: '20kb',
   verify: (req, res, buffer) => {
@@ -82,6 +94,10 @@ app.use('/api/wallet', walletRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/sellers', sellerRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/packages', packageRoutes);
+app.use('/api/evidence', evidenceRoutes);
+app.use('/api/disputes', disputeRoutes);
+app.use('/api/delivery', deliveryRoutes);
 
 // 404 handler
 app.use((req, res) => res.status(404).json({ message: 'Route not found' }));

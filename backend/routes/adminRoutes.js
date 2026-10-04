@@ -12,6 +12,9 @@ const {
 } = require('../controllers/productController');
 const { adminGetOrders, updateOrderStatus, getOrderById, reviewOrderReturn, updateOrderReturnLogistics, cancelOrderShipment, cancelReturnPickup, reconcileUncertainShipment, reconcileUncertainReturnPickup } = require('../controllers/orderController');
 const { getAdminSettlements, markCashCollected, markSettlementPaid, markSettlementRecovered, refreshRazorpayXPayout } = require('../controllers/settlementController');
+const { listDeliveryApplications, updateDeliveryPartnerStatus, listPackages, assignPackage } = require('../controllers/deliveryController');
+const { adminListDisputes, adminReviewDispute } = require('../controllers/disputeController');
+const { getAuditLogs } = require('../controllers/adminController');
 
 router.use(protect, adminOnly); // every admin route requires an admin JWT
 
@@ -45,5 +48,14 @@ router.get('/payouts/:id/provider-status', refreshRazorpayXPayout);
 router.get('/users', getUsers);
 router.put('/users/:id/block', setUserBlocked);
 router.delete('/users/:id', deleteUser);
+
+router.get('/delivery-partners', listDeliveryApplications);
+router.patch('/delivery-partners/:id/status', updateDeliveryPartnerStatus);
+router.get('/packages', listPackages);
+router.patch('/packages/:id/assign', assignPackage);
+
+router.get('/disputes', adminListDisputes);
+router.patch('/disputes/:id', adminReviewDispute);
+router.get('/audit-logs', getAuditLogs);
 
 module.exports = router;

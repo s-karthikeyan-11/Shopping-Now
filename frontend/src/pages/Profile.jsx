@@ -18,6 +18,8 @@ const Profile = () => {
     { label: 'Payment methods', detail: 'Choose a method at checkout', to: '/checkout', icon: CreditCard },
     ...(user?.role === 'seller' ? [{ label: 'Seller dashboard', detail: 'Manage inventory and orders', to: '/seller', icon: Settings }] : []),
     ...(user && user.role !== 'admin' && user.role !== 'seller' ? [{ label: 'Become a seller', detail: 'Open your storefront', to: '/seller/apply', icon: Settings }] : []),
+    ...(user && user.role !== 'admin' && user.role !== 'seller' ? [{ label: 'Delivery workspace', detail: 'Apply or manage package assignments', to: '/delivery/apply', icon: Package }] : []),
+    ...(user?.role === 'delivery' ? [{ label: 'Delivery workspace', detail: 'Manage package assignments', to: '/delivery', icon: Package }] : []),
     { label: 'Settings', detail: 'Account preferences', to: '/profile', icon: Settings },
   ];
   const handleLogout = () => { logout(); navigate('/'); };

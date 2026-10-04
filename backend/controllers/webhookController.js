@@ -19,6 +19,45 @@ exports.handleRazorpayWebhook = async (req, res) => {
   }
 
   const event = req.body.event;
+  if (event === 'payment.captured') {
+    const payment = req.body.payload?.payment?.entity;
+    if (!payment?.id || !payment?.order_id || payment.status !== 'captured') {
+      return res.status(400).json({ message: 'Captured payment event is incomplete' });
+    }
+    try {
+      const order = await Order.findOne({ razorpayOrderId: payment.order_id, paymentMethod: 'Razorpay' });
+      if (!order) return res.json({ received: true });
+      const expectedAmount = Math.round(Number(order.totalAmount || 0) * 100);
+      if (payment.currency !== 'INR' || Number(payment.amount) !== expectedAmount) {
+        console.error(`Razorpay payment amount mismatch for local order ${order._id}`);
+        return res.json({ received: true });
+      }
+      // Compare-and-set makes browser verification and webhook reconciliation
+      // safe to run in either order without double-processing the payment.
+      await Order.findOneAndUpdate(
+        {
+          _id: order._id,
+          status: 'Awaiting Payment',
+          paymentStatus: 'Pending',
+          razorpayOrderId: payment.order_id,
+        },
+        {
+          $set: {
+            status: 'Pending',
+            paymentStatus: 'Paid',
+            razorpayPaymentId: payment.id,
+            paidAt: new Date(),
+            ...(order.coupon ? { couponRedemptionStatus: 'Redeemed' } : {}),
+          },
+        },
+        { new: true, runValidators: true }
+      );
+      return res.json({ received: true });
+    } catch (err) {
+      if (err?.code === 11000) return res.json({ received: true });
+      return res.status(500).json({ message: 'Failed to reconcile captured payment' });
+    }
+  }
   if (!['refund.processed', 'refund.failed'].includes(event)) return res.json({ received: true });
   const refund = req.body.payload?.refund?.entity;
   if (!refund?.id) return res.status(400).json({ message: 'Refund event is missing its refund ID' });

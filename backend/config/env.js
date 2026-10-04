@@ -74,6 +74,10 @@ const validateEnvironment = () => {
   if (isProduction && !/^[a-f0-9]{64}$/i.test(encryptionKey)) {
     throw new Error('SELLER_PAYOUT_ENCRYPTION_KEY must be a 32-byte hexadecimal key in production');
   }
+  const packageSecurityKey = process.env.PACKAGE_SECURITY_KEY || '';
+  if (isProduction && !/^[a-f0-9]{64}$/i.test(packageSecurityKey)) {
+    throw new Error('PACKAGE_SECURITY_KEY must be a 32-byte hexadecimal key in production');
+  }
   if (process.env.RAZORPAYX_PAYOUT_MODE && !['IMPS', 'NEFT', 'RTGS'].includes(process.env.RAZORPAYX_PAYOUT_MODE.toUpperCase())) {
     throw new Error('RAZORPAYX_PAYOUT_MODE must be IMPS, NEFT, or RTGS');
   }
